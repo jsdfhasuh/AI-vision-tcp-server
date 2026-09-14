@@ -1,0 +1,19 @@
+# Explicit build allowlist. Runtime evidence and credentials must never enter images.
+**
+!Dockerfile
+!requirements-web.txt
+!web_server.py
+!database_tools.py
+!competition/
+!competition/**
+!tools/
+!tools/init_web_admin.py
+!tools/healthcheck.py
+**/__pycache__/**
+**/*.pyc
+**/*.pyo
+**/*.sqlite*
+**/*.db*
+**/*.log
+**/.env*
+**/secrets/**

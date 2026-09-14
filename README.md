@@ -1,85 +1,83 @@
-# 视觉比赛 TCP 裁判服务端 + 大屏 · v1.2.0-db
+# 视觉比赛 TCP 服务端 · v1.3.0-web
 
-面向 Windows 裁判电脑的离线工具：包装箱双相机检测与螺钉漏打检测共用 TCP 服务端、中文裁判界面、只读网页大屏和本地 SQLite 数据库。客户端仍使用 UTF-8 JSON Lines / TCP v1。
+**纯 Web 裁判后台 + 只读现场大屏 + TCP v1 + SQLite + Docker 构建配置。**
 
-## 推送到 GitHub
+服务器不再需要桌面、Tkinter、VNC 或 noVNC。裁判用浏览器操作 `/admin/`，观众访问 `/board/`；两者使用不同的数据接口。比赛状态机、TCP 协议和 schema v2 数据库沿用 v1.2.0-db。旧 Windows 桌面入口 `server.py` / `start_server.cmd` 仍保留，其界面版本仍为 1.2.0-db。
 
-本包为待导入的完整源码，并不表示已经上传到远端。Windows 操作步骤见 [推送说明](PUSH_TO_GITHUB.md)。请先克隆目标仓库，再复制源码并提交，保留仓库原有的 `.git`。
+本版从仓库 `main` 的 `1d3992d6f06def52b1221a6e557d5b6dc164eeab` 开发。**交付物是完整源码和 Docker 构建配置，不是已经发布的镜像；本次没有修改远端仓库，也没有部署到 Oracle。**
 
-## 启动
+## 首次部署
 
-安装带 Tcl/Tk 的 Python 3.10+ 后完整解压，双击 `start_server.cmd`。运行不需要第三方 pip 包或独立数据库服务器；查看数据库管理页的SQLite运行时提示，正式部署前核验官方WAL修复版本。
+见 **[Oracle / Docker 部署指南](docs/DOCKER_ORACLE.md)**。指南包含首次创建管理员、目录权限、SSH 隧道、HTTPS 反向代理、升级和恢复。不要跳过密码文件初始化，直接运行 `docker compose up`。
 
-```powershell
-.\start_server.cmd
-# 使用固定数据目录：
-.\start_server.cmd --data-dir "D:\VisionCompetitionData"
-# 允许其他大屏电脑访问网页：
-.\start_server.cmd --data-dir "D:\VisionCompetitionData" --display-host 0.0.0.0 --display-port 9080
+安全默认值：网页和参赛 TCP 只发布到服务器的 `127.0.0.1`；通过 SSH 隧道联调。管理员没有默认密码；本地初始化工具只保存加盐密码哈希。实际数据目录与镜像分离。
+
+```text
+裁判浏览器 → /admin/ → 登录 / CSRF / 状态校验 → 同一个比赛引擎
+参赛软件   → TCP 9000 → JSON Lines v1        → 同一个比赛引擎 → SQLite
+观众浏览器 → /board/ → /api/display         → 仅白名单公开快照
 ```
 
-TCP默认9000，网页默认9080，各自独立。局域网TCP监听地址需在裁判窗口另外设置。默认只绑定本机，适合先本机联调。
+## 已实现
 
-## v1.2.0-db 已实现
+| 模块 | 能力 |
+|---|---|
+| 网页裁判 | 新建练习/正式场次、选择赛项、指定箱型、查看接入码、开始/取消轮次、结束场次 |
+| 检测记录 | 预期与实际分别显示，NG 可以是正确判断；未收到/超时/中断不会自动补 NG |
+| 操作保护 | 登录、HttpOnly 会话 Cookie、同源/CSRF 检查、请求编号去重、旧页面状态拒绝 |
+| 历史与维护 | 只读历史分页、后台备份/导出/完整性检查、登录后下载结果 |
+| 大屏 | 沿用公开白名单，不返回裁判预期、样件类别、接入码、备注和内部原始日志 |
+| 容器 | 单进程、非 root、只读根文件系统、数据挂载、健康检查、正常停机清理 |
 
-- 正式/练习用途创建后锁定；旧数据保持LEGACY未分类，不猜测用途。
-- 数据库管理窗口：队伍、用途、赛项、UTC日期筛选与场次分页；历史记录只读保护。
-- 目标版本历史、界面设置入库、显式schema v2迁移；升级前备份；拒绝未知版本/自动降级。
-- SQLite一致性在线备份、完整性/SHA256验证，以及恢复到新空目录，不覆盖原证据。
-- 界面切场及正常退出自动备份；保留结果先提交再ACK、去重和异常恢复逻辑。
-- 导出不再在写文件阶段持有引擎锁；新增快照边界与目标历史。
-- 大屏显示练习/正式标签；“待结果”不冒充相机已开拍；取消不增加已接收参考进度。
+一个实例同一时间只管理一个活动场次。包装箱和螺钉赛项切换时新建场次。**不是多赛道并发调度系统，也不是多管理员权限系统。** 多浏览器可以访问同一后台，但共享一个管理员身份和引擎。
 
-数据库管理窗口不会开放到大屏HTTP服务。数据库和完整备份包含裁判预期与接入码，未加密，请仅交授权裁判。
+## 非 Docker 的本机开发
 
-## 使用流程
+Web 入口建议使用 Python 3.13；以下依赖锁按该运行环境验证。Windows 原桌面运行方式不受影响。
 
-创建场次并确认练习/正式用途 → 配置指定箱型 → 启动TCP监听 → 参赛端握手/确认目标 → 裁判开始轮次 → 视觉软件发送最终OK/NG → 服务端保存后确认。开启主窗口“打开现场大屏”，只投屏网页，不镜像裁判桌面。
-
-先使用 `start_mock_client.cmd` 与服务端联调。模拟客户端循环发送OK/NG，不读裁判预期，不代表真实视觉识别能力。`preview_display.html` 是完全独立且明确标注的演示页，不能作为比赛实时页面。
-
-## 数据管理命令
-
-```powershell
-.\database_tools.cmd check
-.\database_tools.cmd sessions --mode OFFICIAL --team "队伍" --limit 50
-.\database_tools.cmd backup
-.\database_tools.cmd restore --backup "D:\备份\某次备份文件夹" --to "D:\恢复到的新目录"
+```bash
+python -m venv .venv
+# Linux: source .venv/bin/activate
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-web.txt
+python tools/init_web_admin.py
+python web_server.py
 ```
 
-非默认数据目录：在子命令**前**加 `--data-dir`。例如：
+浏览器使用配置中的**准确主机名**：默认 `http://localhost:9080/admin/` 和 `http://localhost:9080/board/`。默认配置下不要改用 `127.0.0.1` 作为浏览器地址，否则 Host 校验会拒绝。参赛软件连接 `127.0.0.1:9000`。
 
-```powershell
-.\database_tools.cmd --data-dir "D:\VisionCompetitionData" backup --output "D:\备份"
+创建场次 → 设置箱型 → 查看接入码 → 运行 `client_example.py --help` 或原 `start_mock_client.cmd` → 客户端握手并确认目标版本 → 开始本轮 → 自动接收最终 OK/NG。先用模拟器联调，再接真实视觉程序。
+
+`.env` 由 Docker Compose 读取；直接运行 Python 不会自动加载 `.env`，请设置系统环境变量或使用 `web_server.py --help` 中的参数。
+
+## 数据与兼容性
+
+数据在 `/data/competition.sqlite3` 及其附属目录中；凭据单独挂载到 `/run/secrets/admin.json`。不能让桌面版和 Web 版同时写同一数据库，也不能用多 worker 或多个容器共享同一个活动比赛引擎。
+
+切场/结束场次自动排队备份，正常退出尽力完成最终备份；失败写日志，不假装完成。启动后未完成的旧轮次标记中断，不恢复旧计时。维护任务列表保存在内存，重启后清空，但已生成文件仍在磁盘。没有自动删除证据/备份的功能，需要裁判按制度归档。
+
+数据库包含裁判私有数据和参赛接入码，**未加密**；密码哈希文件不在数据库备份内。原 TCP v1 仍是明文 TCP，HTTPS 只保护网页，参赛 TCP 应经 SSH/VPN 或可信隔离网络连接。
+
+## 验证
+
+```bash
+python -m pip install -r requirements-web-test.txt
+python -m unittest discover -s tests -p 'test_*.py' -v
+python tests/web_http_smoke.py --output-dir /tmp/vision-web-smoke
 ```
 
-正常使用只需点界面“数据库管理”，不必手写SQL。需要安装环境/EXE打包说明可查看下面文档；本交付包不包含已编译EXE。
+本次 176 项自动化测试通过，另外完成两个赛项各 10 轮真实 HTTP + 独立 TCP 模拟客户端联调。实际浏览器直连被测试环境网络策略阻止；前端另外完成无网络的演示数据渲染检查，**不能把离线渲染当成端到端浏览器验收**。
+
+当前环境没有 Docker，未构建镜像，未验证 ARM64 容器、Oracle 实机、Windows 或真实相机。详见 [本版测试报告](docs/TEST_REPORT_V1_3_WEB.md)。基础镜像更新和依赖安全更新需要部署时复核；SQLite 运行时提示保留，不宣称任意发行版都已经包含 WAL 修复。
 
 ## 文档
 
-- [数据库、迁移、备份与恢复](docs/DATABASE_GUIDE.md)
-- [本版测试报告与验收边界](docs/TEST_REPORT_V1_2_DB.md)
-- [TCP完整协议](docs/PROTOCOL_V1.md)
-- [投屏使用说明](docs/DISPLAY_GUIDE.md)
-- [Windows部署与打包](docs/WINDOWS_DEPLOYMENT.md)
-- [现场验收清单](docs/ACCEPTANCE_CHECKLIST.md)
+- [Oracle / Docker 首次启动、HTTPS、数据与运维](docs/DOCKER_ORACLE.md)
+- [Web API、鉴权与操作约束](docs/WEB_API.md)
+- [v1.3 实测结果与边界](docs/TEST_REPORT_V1_3_WEB.md)
+- [TCP v1 协议](docs/PROTOCOL_V1.md)
+- [SQLite 迁移、备份与恢复](docs/DATABASE_GUIDE.md)
+- [原桌面版投屏说明](docs/DISPLAY_GUIDE.md)
+- [变更记录](CHANGELOG.md)
 
-相机画面上传、观众大字专属布局、完整候场/暂停/完赛流程、自动总分/成绩发布/排行榜尚未加入。本版不是上一次复查建议的全部实现。
-
-## 升级注意
-
-关闭旧程序，用新版 `--data-dir` 指向原数据目录。会先备份旧库再迁移。不要只搬运运行中的 `.sqlite3` 主文件，也不要再用旧版打开升级后的主库。具体回退方法见数据库说明。
-
-## 自测
-
-```powershell
-py -3.12 -m unittest discover -s tests -p "test_*.py" -v
-```
-
-Tk、浏览器及真实网络联调脚本在 `tests/` 中，属于另外的验收检查；Playwright/Pillow只用于测试和截图，不是程序运行依赖。
-
-## GitHub 仓库说明
-
-此仓库导入自 `vision_competition_tcp_v1_2_db.zip`，程序源码与该交付版本一致。运行数据、数据库、备份、日志和自动生成的截图不提交；历史测试报告中提及的原始截图、JSON 和运行输出保留在原交付压缩包内。仓库保留全部测试脚本和数据库迁移测试夹具，可重新生成验证记录。
-
-本次入库复验与文件范围见 [仓库导入说明](docs/REPOSITORY_IMPORT.md)。尚未构建 Windows EXE，也未完成 Windows 实机及现场大屏验收。
+相机图片上传/实时视频、自动总分/排行榜、完整候场和裁判暂停流程、多赛道调度、TCP TLS 与多账户权限本版未实现。正式比赛仍建议保留现场本地部署，云端往返时间不能等同于算法耗时。

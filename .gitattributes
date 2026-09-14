@@ -7,3 +7,8 @@
 *.sql text eol=lf
 *.svg text eol=lf
 *.cmd text eol=crlf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+.env.example text eol=lf

@@ -1,0 +1,15 @@
+# Web-only dependencies pinned to the runtime used for this delivery.
+# Desktop/TCP core remains standard-library only. Review security updates before public deployment.
+fastapi==0.128.2
+uvicorn==0.48.0
+starlette==0.50.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+annotated-types==0.7.0
+annotated-doc==0.0.4
+typing_extensions==4.16.0
+typing-inspection==0.4.2
+anyio==4.13.0
+idna==3.17
+h11==0.16.0
+click==8.1.8

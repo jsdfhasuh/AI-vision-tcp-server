@@ -44,3 +44,12 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Web deployment secrets and runtime outputs
+/secrets/
+/downloads/
+*.pem
+*.key
+*.partial
+*.tar
+*.tar.gz

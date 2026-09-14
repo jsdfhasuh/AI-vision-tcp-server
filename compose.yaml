@@ -1,0 +1,49 @@
+services:
+  app:
+    image: ai-vision-tcp-server:1.3.0-web
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim-trixie}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 120s
+    ports:
+      - "${WEB_BIND_IP:-127.0.0.1}:${WEB_PUBLISHED_PORT:-9080}:9080"
+      - "${TCP_BIND_IP:-127.0.0.1}:${TCP_PUBLISHED_PORT:-9000}:9000"
+    environment:
+      DATA_DIR: /data
+      WEB_ADMIN_FILE: /run/secrets/admin.json
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:9080}
+      WEB_ALLOW_INSECURE_HTTP: ${WEB_ALLOW_INSECURE_HTTP:-0}
+      AUTO_BACKUP: ${AUTO_BACKUP:-1}
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: "9080"
+      TCP_HOST: 0.0.0.0
+      TCP_PORT: "9000"
+    volumes:
+      - type: bind
+        source: ${DATA_PATH:-/docker_volume/AI-vision-tcp-server/data}
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./secrets/admin.json
+        target: /run/secrets/admin.json
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

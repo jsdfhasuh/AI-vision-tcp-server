@@ -1,3 +1,5 @@
-# 本版测试报告
+# 测试报告索引
 
-请查看 [v1.2.0-db测试报告](TEST_REPORT_V1_2_DB.md)。原有v1.1结果保存于 `TEST_REPORT_V1_1_HISTORICAL.md`，不可替代新版验收。
+当前纯Web源码交付见 [v1.3.0-web](TEST_REPORT_V1_3_WEB.md)。
+
+原桌面/数据库版本见 [v1.2.0-db](TEST_REPORT_V1_2_DB.md)。历史报告不等于当前 Docker 实机验收。
