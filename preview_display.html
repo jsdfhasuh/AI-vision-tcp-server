@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="vision-display-mode" content="demo">
+<meta name="color-scheme" content="dark light">
+<title>界面演示 · 非比赛数据</title>
+
+<style>
+:root{color-scheme:dark;--bg:#07111e;--surface:#0d1a2b;--surface-2:#102237;--line:#22344a;--text:#edf4ff;--muted:#90a5be;--faint:#627b97;--accent:#62dfc4;--ok:#63e3bd;--ok-soft:rgba(71,218,173,.09);--ng:#ffaf72;--ng-soft:rgba(255,171,105,.09);--warn:#ffd37b;--shadow:0 12px 40px rgba(0,0,0,.09);--scale:1}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}body{background:var(--bg);color:var(--text);font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;padding:36px 48px;display:grid;grid-template-rows:82px 88px 398px 314px 30px;gap:24px;transform:translate(-50%,-50%) scale(var(--scale));transform-origin:center;background:radial-gradient(ellipse at 68% -10%,#132c45 0,transparent 53%),var(--bg)}[hidden]{display:none!important}h1,h2,p{margin:0}button{font:inherit;cursor:pointer}button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.masthead{display:flex;align-items:center;justify-content:space-between;min-width:0}.brand{display:flex;gap:21px;align-items:center;min-width:0}.brand-icon{height:64px;width:64px;flex-shrink:0}.brand-icon rect{fill:var(--surface-2)}.brand-icon path,.brand-icon circle{stroke:var(--accent);stroke-width:2.8;fill:none}.brand-icon .pupil{fill:var(--accent);stroke:none}.brand-copy{min-width:0}.eyebrow{font-size:12px;letter-spacing:2.2px;font-weight:600;color:var(--accent);line-height:18px}.eyebrow .divider{margin:0 9px;color:var(--faint)}h1{font-size:34px;line-height:46px;letter-spacing:2px;font-weight:700;max-width:1090px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#event-subtitle{font-size:14px;color:var(--muted);letter-spacing:1px;white-space:nowrap;max-width:1090px;text-overflow:ellipsis;overflow:hidden}.header-right{display:flex;gap:30px;align-items:center;margin-left:20px;flex-shrink:0}.clock-wrap{text-align:right;min-width:186px}#clock{font-family:"Bahnschrift","DIN Alternate","Consolas",monospace;font-size:39px;line-height:44px;letter-spacing:2px}#date{font-size:14px;letter-spacing:1px;color:var(--muted);margin-top:5px}.demo-badge{border:1px solid #7b6040;background:#33281f;color:#ffd394;padding:10px 14px;border-radius:7px;font-size:16px;font-weight:650;letter-spacing:.5px}.session-strip{border:1px solid var(--line);border-radius:14px;background:linear-gradient(100deg,rgba(33,64,92,.36),rgba(16,31,49,.3));display:grid;grid-template-columns:minmax(420px,1fr) 435px 205px 286px;align-items:center;padding:0 28px;gap:28px}.section-label{display:block;font-size:16px;font-weight:500;color:var(--muted);letter-spacing:.6px}.team-block{min-width:0}.team-block strong{display:block;font-size:29px;line-height:38px;letter-spacing:.7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.contest-block,.round-block,.link-block{border-left:1px solid var(--line);padding-left:28px}.contest-block strong{font-size:24px;line-height:37px;font-weight:600;white-space:nowrap}.round-block strong{font-size:30px;line-height:37px;letter-spacing:2px;font-family:"Bahnschrift","Consolas",monospace}.round-block small{font-family:inherit;font-size:15px;color:var(--muted);font-weight:400;margin-left:10px;letter-spacing:0}.link-block{display:flex;flex-direction:column;gap:8px;align-items:flex-start}.status-pill{display:inline-flex;align-items:center;gap:9px;font-size:17px;font-weight:600;color:var(--warn)}.status-pill i,.feed-status i{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}.status-pill[data-state="ready"]{color:var(--ok)}.status-pill[data-state="offline"]{color:var(--ng)}#client-description{font-size:13px;color:var(--muted);white-space:nowrap}.panel{border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}.main-grid{display:grid;grid-template-columns:minmax(0,1.57fr) minmax(0,1fr);gap:24px}.hero{--state:var(--accent);position:relative;padding:25px 30px 0;display:flex;flex-direction:column;background:radial-gradient(ellipse at 20% 45%,rgba(26,63,73,.22),transparent 78%),var(--surface)}.hero:before{content:"";position:absolute;left:0;top:30px;bottom:30px;width:4px;background:var(--state);border-radius:0 4px 4px 0}.hero[data-state="ok"]{--state:var(--ok);background:radial-gradient(ellipse at 25% 45%,var(--ok-soft),transparent 85%),var(--surface)}.hero[data-state="ng"]{--state:var(--ng);background:radial-gradient(ellipse at 25% 45%,var(--ng-soft),transparent 85%),var(--surface)}.hero[data-state="warning"]{--state:var(--warn)}.hero[data-state="idle"]{--state:var(--muted)}.hero-top{display:flex;align-items:center;justify-content:space-between}.hero-top .section-label{color:var(--text);font-size:18px;letter-spacing:1px}.outline-pill{font-size:13px;line-height:27px;border:1px solid var(--line);border-radius:5px;padding:0 10px;color:var(--muted)}.hero-center{display:flex;align-items:center;justify-content:space-between;gap:20px;flex:1;min-height:0;padding-bottom:12px}.verdict-copy{min-width:0}.result-value{font-family:"Bahnschrift","Arial",sans-serif;font-size:153px;font-weight:650;letter-spacing:4px;line-height:155px;color:var(--state);margin-left:-5px}.result-value.long{font-family:inherit;font-size:69px;line-height:128px;letter-spacing:2px;margin-left:0;font-weight:650}.result-description{font-size:26px;font-weight:600;line-height:38px;white-space:nowrap}.result-detail{font-size:15px;color:var(--muted);margin-top:6px;white-space:nowrap}.result-orbit{width:203px;height:203px;margin:0 25px 8px 0;position:relative;flex-shrink:0}.result-orbit svg{width:100%;height:100%;overflow:visible}.orbit-outer{fill:none;stroke:var(--state);stroke-width:1;stroke-opacity:.26;stroke-dasharray:3 5}.orbit-inner{fill:none;stroke:var(--state);stroke-opacity:.2;stroke-width:1}.orbit-dot{fill:var(--state);opacity:.8}#state-icon{fill:none;stroke:var(--state);stroke-width:6;stroke-linecap:round;stroke-linejoin:round}.orbit-grid{position:absolute;inset:40px;background:linear-gradient(var(--state) 1px,transparent 1px),linear-gradient(90deg,var(--state) 1px,transparent 1px);background-size:25px 25px;opacity:.04;border-radius:50%}.hero-bottom{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:24px;border-top:1px solid var(--line);padding:17px 0 20px;height:92px;flex-shrink:0}.hero-bottom .section-label{font-size:13px;margin-bottom:5px}.hero-bottom strong{font-family:"Bahnschrift","Consolas",monospace;font-size:26px;line-height:30px;font-weight:550}.hero-bottom strong small{font-size:15px;color:var(--muted);font-weight:400}.hero-bottom strong.status-text{font-family:inherit;font-size:21px;letter-spacing:.5px}.last-time{text-align:right}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:1fr 1fr;gap:18px}.metric{padding:20px 24px;position:relative}.metric-head{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:17px;font-weight:500;white-space:nowrap}.metric-icon{font-size:22px;font-family:"Consolas",monospace;color:var(--faint)}.metric strong{font-family:"Bahnschrift","Arial",sans-serif;display:block;font-size:65px;font-weight:550;letter-spacing:1px;line-height:82px}.metric-foot{font-size:13px;color:var(--muted);line-height:23px;white-space:nowrap}.metric-ok strong{color:var(--ok)}.metric-ng strong{color:var(--ng)}.mini-pill{border:1px solid var(--line);border-radius:4px;font-family:"Consolas",monospace;font-size:12px;font-weight:600;padding:2px 5px}.metric-ok .mini-pill{color:var(--ok)}.metric-ng .mini-pill{color:var(--ng)}.progress-track{height:3px;background:var(--line);position:absolute;bottom:0;left:24px;right:24px;border-radius:3px;overflow:hidden}#progress-fill{height:100%;width:0;background:var(--accent);transition:width .25s ease}.bottom-grid{display:grid;grid-template-columns:minmax(0,1.57fr) minmax(0,1fr);gap:24px}.records,.trend{padding:20px 28px}.panel-title{display:flex;align-items:baseline;justify-content:space-between;gap:16px}.panel-title h2{font-size:20px;font-weight:600;letter-spacing:.5px}.panel-title>span{color:var(--muted);font-size:13px;white-space:nowrap}.records table{border-collapse:collapse;width:100%;table-layout:fixed;margin-top:13px}th{text-align:left;font-size:13px;font-weight:400;color:var(--muted);height:32px;border-bottom:1px solid var(--line)}td{height:32px;font-size:16px;font-weight:450;border-bottom:1px solid rgba(93,116,143,.14);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}tr:last-child td{border-bottom:none}th:first-child,td:first-child{width:80px;color:var(--muted);font-family:"Consolas",monospace}th:nth-child(2){width:160px}th:nth-child(3){width:220px}th:nth-child(4){width:180px}th:last-child,td:last-child{width:150px}.right{text-align:right}td.numeric{font-family:"Bahnschrift","Consolas",monospace;letter-spacing:.5px}.result-chip{display:inline-block;padding:2px 10px;font-size:14px;font-weight:650;letter-spacing:.5px;min-width:47px;text-align:center;border-radius:5px;background:var(--surface-2);color:var(--muted)}.result-chip.ok{color:var(--ok);background:var(--ok-soft)}.result-chip.ng{color:var(--ng);background:var(--ng-soft)}.row-warning{color:var(--warn)}.empty-records{height:205px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);font-size:20px;gap:12px}.empty-records span{font-size:14px;color:var(--faint)}.chart-summary{display:flex;align-items:center;gap:24px;margin-top:21px;color:var(--muted);font-size:14px}.chart-summary strong{font-family:"Bahnschrift","Consolas",monospace;font-weight:500;font-size:25px;color:var(--text);margin-left:6px}.chart-summary small{font-size:12px}.legend{margin-left:auto;font-size:12px;display:flex;align-items:center;gap:7px}.legend i{width:15px;height:2px;background:var(--accent);display:inline-block}.chart-area{height:142px;position:relative;margin-top:14px}#timing-chart{width:100%;height:100%;overflow:visible}#timing-chart text{font-family:"Bahnschrift","Consolas",monospace;fill:var(--muted);font-size:11px}#timing-chart .chart-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}#timing-chart .chart-line{stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;fill:none}#timing-chart .chart-fill{fill:var(--accent);opacity:.07}#timing-chart .chart-point{fill:var(--surface);stroke:var(--accent);stroke-width:2}#timing-chart .chart-point.late{stroke:var(--warn)}#chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:16px}.timing-caption{font-size:12px;color:var(--muted);line-height:18px;margin-top:10px;white-space:nowrap}footer{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:13px;gap:20px}.feed-status{display:flex;align-items:center;gap:8px;font-size:13px;min-width:295px}.feed-status.live{color:var(--accent)}.feed-status.warning{color:var(--warn)}.disclaimer{font-size:15px;color:var(--text);letter-spacing:.3px}.readonly-label{font-size:12px;min-width:295px;text-align:right;color:var(--faint)}.connection-banner{position:absolute;top:240px;left:calc(50% - 400px);width:800px;background:#34291b;border:1px solid #a97a35;border-radius:12px;box-shadow:0 15px 60px #0007;display:flex;gap:18px;align-items:center;padding:20px 24px;z-index:20;color:#ffdfa4}.banner-icon{font-size:32px;display:grid;place-items:center;border:2px solid currentColor;border-radius:50%;width:42px;height:42px;flex-shrink:0}.connection-banner strong{font-size:21px}.connection-banner p{font-size:14px;line-height:24px;margin-top:3px}.stage.stale .metrics,.stage.stale .bottom-grid{opacity:.44}.toolbar{position:absolute;right:48px;bottom:74px;display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);box-shadow:0 8px 30px #0004;opacity:0;pointer-events:none;transition:opacity .18s ease;z-index:30}.toolbar.visible,.toolbar:focus-within{opacity:1;pointer-events:auto}.toolbar-label{font-size:12px;color:var(--muted);padding:0 8px}.toolbar button{border:1px solid var(--line);background:var(--surface);color:var(--text);font-size:14px;padding:8px 13px;border-radius:6px}.toolbar button:hover{border-color:var(--accent);color:var(--accent)}.demo-controls{display:flex;gap:8px}.toast{position:absolute;left:50%;bottom:135px;transform:translateX(-50%);font-size:17px;padding:14px 22px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;z-index:35;white-space:nowrap}.stage.presentation{cursor:none}.stage.presentation .toolbar{cursor:auto}
+body.light{color-scheme:light;--bg:#edf2f6;--surface:#fff;--surface-2:#eaf1f6;--line:#cedae5;--text:#10263f;--muted:#4f6680;--faint:#6c8095;--accent:#087f79;--ok:#087f57;--ok-soft:rgba(11,140,96,.07);--ng:#b45712;--ng-soft:rgba(192,95,28,.065);--warn:#995907;--shadow:0 5px 22px rgba(25,47,76,.035)}body.light .stage{background:radial-gradient(ellipse at 68% -10%,#deedf6 0,transparent 58%),var(--bg)}body.light .session-strip{background:rgba(255,255,255,.65)}body.light .hero{background:var(--surface)}body.light .hero[data-state="ok"]{background:linear-gradient(115deg,var(--ok-soft),transparent),var(--surface)}body.light .hero[data-state="ng"]{background:linear-gradient(115deg,var(--ng-soft),transparent),var(--surface)}body.light .demo-badge{background:#fff4dc;color:#87500b;border-color:#d9b77b}body.light .connection-banner{background:#fff1d5;border-color:#d4a35a;color:#6d410d}body.light .hero .outline-pill{background:#ffffff80}@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
+
+</style>
+
+</head>
+<body>
+<div class="stage" id="stage">
+  <header class="masthead">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16"/><path d="M14 26V14h12m12 0h12v12m0 12v12H38m-12 0H14V38"/><circle cx="32" cy="32" r="10"/><circle class="pupil" cx="32" cy="32" r="3"/></svg>
+      <div class="brand-copy"><div class="eyebrow">VISION SKILLS <span class="divider">/</span> 现场比赛展板</div><h1 id="event-title">工业视觉技能竞赛</h1><p id="event-subtitle">双赛项现场展示 · 以视觉见实力</p></div>
+    </div>
+    <div class="header-right"><span class="demo-badge" id="demo-badge" hidden>界面演示 · 非比赛数据</span><div class="clock-wrap"><time id="clock">--:--:--</time><div id="date">----年--月--日</div></div></div>
+  </header>
+
+  <section class="session-strip" aria-label="参赛场次">
+    <div class="team-block"><span class="section-label">当前参赛队伍</span><strong id="team-name">等待场次建立</strong></div>
+    <div class="contest-block"><span class="section-label" id="contest-label">竞赛项目</span><strong id="competition-name">尚未选择赛项</strong></div>
+    <div class="round-block"><span class="section-label">当前轮次</span><strong><span id="round-number">—</span><small>轮</small></strong></div>
+    <div class="link-block"><span class="status-pill" id="client-status"><i></i><span>等待连接</span></span><span id="client-description">等待服务端状态</span></div>
+  </section>
+
+  <main class="main-grid">
+    <section class="hero panel" id="hero" data-state="idle" aria-label="实时检测结果">
+      <div class="hero-top"><span class="section-label" id="result-heading">当前检测结果</span><span class="outline-pill" id="result-source">等待实时数据</span></div>
+      <div class="hero-center"><div class="verdict-copy"><div class="result-value" id="result-value" role="status" aria-live="polite">—</div><div class="result-description" id="result-description">准备就绪，等待比赛开始</div><div class="result-detail" id="result-detail">展板只展示结果，不参与视觉检测与裁判评分。</div></div><div class="result-orbit" aria-hidden="true"><div class="orbit-grid"></div><svg viewBox="0 0 180 180"><circle class="orbit-outer" cx="90" cy="90" r="84"/><circle class="orbit-inner" cx="90" cy="90" r="64"/><path id="state-icon" d="M60 90h60"/><circle class="orbit-dot" cx="90" cy="6" r="4"/></svg></div></div>
+      <div class="hero-bottom"><div><span class="section-label">本轮观测耗时</span><strong id="elapsed">—<small> ms</small></strong></div><div><span class="section-label">结果接收状态</span><strong class="status-text" id="receipt-status">尚无记录</strong></div><div class="last-time"><span class="section-label">结果接收时间</span><strong class="status-text" id="received-time">—</strong></div></div>
+    </section>
+    <section class="metrics" aria-label="本场结果统计">
+      <article class="metric panel"><div class="metric-head"><span>本场已发起轮次</span><span class="metric-icon">#</span></div><strong id="count-total">0</strong><div class="metric-foot"><span id="round-goal">结果接收参考 · 非连续测试判定</span></div><div class="progress-track"><div id="progress-fill"></div></div></article>
+      <article class="metric panel"><div class="metric-head"><span>已接收结果</span><span class="metric-icon">↙</span></div><strong id="count-received">0</strong><div class="metric-foot" id="receipt-note">超时未收 0 · 迟到 0</div></article>
+      <article class="metric panel metric-ok"><div class="metric-head"><span>客户端输出 OK</span><span class="mini-pill">OK</span></div><strong id="count-ok">0</strong><div class="metric-foot">产品合格判定次数</div></article>
+      <article class="metric panel metric-ng"><div class="metric-head"><span>客户端输出 NG</span><span class="mini-pill">NG</span></div><strong id="count-ng">0</strong><div class="metric-foot">产品不合格判定次数 · 非扣分数</div></article>
+    </section>
+  </main>
+
+  <section class="bottom-grid">
+    <article class="records panel"><div class="panel-title"><h2>最近轮次</h2><span>按测试轮次排序 · 最近 6 轮</span></div><table><thead><tr><th>轮次</th><th>客户端结果</th><th>接收状态</th><th class="right">观测耗时</th><th class="right">接收时间</th></tr></thead><tbody id="records-body"></tbody></table><div id="records-empty" class="empty-records">尚无测试记录<span>裁判开始本轮后，这里将自动更新。</span></div></article>
+    <article class="trend panel"><div class="panel-title"><h2>服务端观测耗时</h2><span>最近 20 轮中的已接收结果</span></div><div class="chart-summary"><span>平均 <strong id="timing-average">—</strong><small> ms</small></span><span>峰值 <strong id="timing-max">—</strong><small> ms</small></span><span class="legend"><i></i>单轮耗时</span></div><div class="chart-area"><svg id="timing-chart" viewBox="0 0 650 132" role="img" aria-label="最近轮次的服务端观测耗时折线图"></svg><div id="chart-empty">等待有效耗时记录</div></div><p class="timing-caption">计时：服务端开始本轮 → 完整结果进入处理；不是纯推理耗时。</p></article>
+  </section>
+
+  <footer><span class="feed-status" id="feed-status"><i></i>正在连接展板服务</span><span class="disclaimer">OK / NG 仅代表参赛软件的产品判定，不代表裁判评分。</span><span class="readonly-label">只读展示 · 不公开预设答案</span></footer>
+
+  <div class="connection-banner" id="connection-banner" hidden role="alert"><span class="banner-icon">!</span><div><strong id="banner-title">展板连接中断</strong><p id="banner-description">已停止实时显示，正在重新连接。下方保留记录不是当前实时状态。</p></div></div>
+  <div class="toolbar" id="toolbar"><span class="toolbar-label">展板设置</span><button id="contrast-button" type="button" title="切换浅色高亮主题" aria-label="切换浅色高亮主题">明亮模式</button><button id="fullscreen-button" type="button" title="全屏 / F" aria-label="全屏展示">⛶ 全屏</button><span class="demo-controls" id="demo-controls" hidden><button id="demo-mode" type="button">切换赛项</button><button id="demo-next" type="button">下一状态</button><button id="demo-pause" type="button">暂停演示</button></span></div>
+  <div id="toast" class="toast" hidden role="status"></div>
+</div>
+<noscript>展板需要启用浏览器 JavaScript。裁判 TCP 服务端不受影响。</noscript>
+<script>
+/* Offline-capable, read-only competition display. No external scripts or fonts.
+ * Live mode NEVER falls back to mock data. Local preview is explicitly labelled.
+ */
+"use strict";
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const stage = $("stage");
+  const demo = document.querySelector('meta[name="vision-display-mode"]').content === "demo";
+  const statusNames = { WAITING: "等待结果", RECEIVED: "已接收", TIMEOUT: "超时未收", LATE: "迟到结果", CANCELLED: "裁判取消", INTERRUPTED: "测试中断" };
+  const competitionNames = { packaging: "包装箱双相机检测", screw: "螺钉漏打检测" };
+  let snapshot = null;
+  let fresh = false;
+  let lastFreshAt = 0;
+  let elapsedBase = null;
+  let elapsedAt = 0;
+  let tableSignature = "";
+  let chartSignature = "";
+  let toolbarTimer = null;
+  let toastTimer = null;
+  let demoStep = 0;
+  let demoMode = "packaging";
+  let demoPaused = false;
+  let pollTimer = null;
+  let pollInProgress = false;
+  let demoStarted = performance.now();
+
+  function text(id, value) { $(id).textContent = String(value); }
+  function fit() { stage.style.setProperty("--scale", String(Math.min(innerWidth / 1920, innerHeight / 1080))); }
+  function number(value) { return Number.isFinite(value) ? value.toLocaleString("zh-CN", { maximumFractionDigits: 1 }) : "—"; }
+  function clockTime(value) {
+    if (!value) return "—";
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? "—" : dt.toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  function updateClock() {
+    const now = new Date();
+    text("clock", clockTime(now));
+    text("date", now.toLocaleDateString("zh-CN", {year:"numeric", month:"2-digit", day:"2-digit", weekday:"short"}));
+  }
+  function setElapsed(value) {
+    const host = $("elapsed");
+    host.replaceChildren(document.createTextNode(number(value)));
+    const unit = document.createElement("small");
+    unit.textContent = " ms";
+    host.append(unit);
+  }
+  function toast(message) {
+    text("toast", message); $("toast").hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").hidden = true; }, 3800);
+  }
+  function showToolbar() {
+    stage.classList.remove("presentation");
+    $("toolbar").classList.add("visible");
+    clearTimeout(toolbarTimer);
+    toolbarTimer = setTimeout(() => {
+      if (!$("toolbar").contains(document.activeElement)) $("toolbar").classList.remove("visible");
+      if (document.fullscreenElement) stage.classList.add("presentation");
+    }, 3200);
+  }
+  async function fullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+      else toast("浏览器未提供全屏接口，请按 F11 全屏。");
+    } catch (_) { toast("浏览器未允许全屏，请按 F11，或再次点击全屏按钮。"); }
+  }
+  function updateFullscreenButton() {
+    text("fullscreen-button", document.fullscreenElement ? "⛶ 退出全屏" : "⛶ 全屏");
+    showToolbar();
+  }
+  function toggleContrast() {
+    const light = document.body.classList.toggle("light");
+    text("contrast-button", light ? "深色模式" : "明亮模式");
+    try { localStorage.setItem("vision-display-theme", light ? "light" : "dark"); } catch (_) { /* file:// and private mode can reject storage */ }
+  }
+  function renderConnection(data, stale) {
+    const el = $("client-status");
+    const info = data?.connection;
+    let label = "等待连接", state = "offline", detail = "等待服务端状态";
+    if (stale) { label = "状态未知"; detail = "展板数据已暂停更新"; }
+    else if (info?.fault) { label = "服务异常"; detail = "请联系现场裁判"; }
+    else if (!data?.session) { label = "待开赛"; state = "idle"; detail = "裁判尚未建立场次"; }
+    else if (!info?.listening) { label = "TCP 未监听"; detail = "检测服务尚未启动"; }
+    else if (!info?.connected) { label = "客户端未连接"; detail = "等待参赛端建立连接"; }
+    else if (!info?.ready) { label = "客户端已连接"; state = "pending"; detail = "等待确认目标版本"; }
+    else { label = "客户端已就绪"; state = "ready"; detail = "TCP 已连接 · 目标已确认"; }
+    el.dataset.state = state;
+    el.querySelector("span").textContent = label;
+    text("client-description", detail);
+  }
+  function renderHero(data, stale) {
+    const row = data?.latest;
+    let value = "待开赛", description = "准备就绪，等待比赛开始", detail = "展板只展示结果，不参与视觉检测与裁判评分。";
+    let state = "idle", icon = "M60 90h60", source = "等待实时数据";
+    if (stale) {
+      value = "已离线"; description = "展板数据暂不可用"; detail = "正在自动重连；旧结果不会作为实时结果展示。"; state = "warning";
+    } else if (data?.connection.fault) {
+      value = "已暂停"; description = "检测服务异常，请联系裁判"; detail = "已停止展示当前判定，请以裁判端核验为准。"; state = "warning";
+    } else if (!data?.session) {
+      source = "等待场次建立";
+    } else if (!row) {
+      value = "待检测"; description = "等待裁判开始第一轮测试"; source = "已建立比赛场次";
+      detail = "参赛软件完成检测后，将上报最终 OK / NG。";
+    } else if (row.status === "WAITING") {
+      value = "待结果"; state = "waiting";
+      description = !data.connection.connected ? "本轮等待中 · 客户端已断开" : row.action === "arm" ? "轮次已布置 · 请按现场约定触发" : "已下发检测命令 · 等待最终结果";
+      detail = row.timeout_ms > 0 ? `本轮时限 ${number(row.timeout_ms)} ms；超时不会自动判为 NG。` : "本轮只记录耗时，不设置自动超时判定。";
+      icon = "M90 48v42l28 17"; source = "参赛端结果待接收";
+    } else if (row.actual === "OK" || row.actual === "NG") {
+      value = row.actual; state = row.actual.toLowerCase();
+      description = row.actual === "OK" ? "产品合格 · 客户端判定" : "产品不合格 · 客户端判定";
+      detail = row.actual === "OK" ? "已收到参赛端最终结果，最终评分由裁判确认。" : "NG 是产品判定，不等于参赛者检测错误。";
+      icon = row.actual === "OK" ? "M56 92l23 23 46-49" : "M65 65l50 50M115 65l-50 50";
+      source = row.status === "LATE" ? "迟到结果 · 不计为按时到达" : "最终结果已接收";
+    } else {
+      const labels = { TIMEOUT: ["已超时", "规定时间内未收到有效结果", "未收到结果不等于 NG，请以裁判端记录为准。"], CANCELLED: ["已取消", "本轮测试已由裁判取消", "该轮不产生正常检测结果，等待下一轮。"], INTERRUPTED: ["已中断", "本轮测试未正常完成", "该轮不产生正常检测结果，请联系裁判。"] };
+      [value, description, detail] = labels[row.status] || ["待核验", "未知的轮次状态", "请联系现场裁判核验。"];
+      state = "warning"; icon = "M90 52v48M90 120v2"; source = "没有有效产品判定";
+    }
+    $("hero").dataset.state = state;
+    text("result-value", value); $("result-value").classList.toggle("long", value.length > 2);
+    text("result-description", description); text("result-detail", detail); text("result-source", source);
+    text("result-heading", row && row.status !== "WAITING" ? "最近一轮检测结果" : "当前检测结果");
+    $("state-icon").setAttribute("d", icon);
+    setElapsed(stale || data?.connection.fault ? null : row?.elapsed_ms);
+    text("receipt-status", stale ? "状态未知" : (row ? statusNames[row.status] || "待核验" : "尚无记录"));
+    text("received-time", stale ? "—" : clockTime(row?.received_utc));
+    elapsedBase = !stale && !data?.connection.fault && row?.status === "WAITING" ? row.elapsed_ms : null;
+    elapsedAt = performance.now();
+  }
+  function renderTable(rows) {
+    const signature = JSON.stringify(rows.map((r) => [r.number, r.actual, r.status, r.status === "WAITING" ? null : r.elapsed_ms, r.received_utc]));
+    if (signature === tableSignature) return;
+    tableSignature = signature;
+    const host = $("records-body"); host.replaceChildren();
+    $("records-empty").hidden = rows.length > 0;
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      function cell(value, css = "") { const td = document.createElement("td"); td.textContent = value; td.className = css; tr.append(td); return td; }
+      cell(String(row.number).padStart(2, "0"));
+      const badge = document.createElement("span"); badge.className = "result-chip" + (row.actual === "OK" ? " ok" : row.actual === "NG" ? " ng" : ""); badge.textContent = row.actual || "—";
+      cell("").append(badge);
+      cell(statusNames[row.status] || "未知状态", ["TIMEOUT", "LATE", "INTERRUPTED"].includes(row.status) ? "row-warning" : "");
+      cell(row.status === "WAITING" ? "计时中" : (number(row.elapsed_ms) + (row.elapsed_ms == null ? "" : " ms")), "right numeric");
+      cell(clockTime(row.received_utc), "right numeric");
+      host.append(tr);
+    }
+  }
+  function renderChart(rows) {
+    const signature = JSON.stringify(rows);
+    if (signature === chartSignature) return;
+    chartSignature = signature;
+    const valid = rows.filter((r) => Number.isFinite(r.elapsed_ms));
+    const svg = $("timing-chart"); svg.replaceChildren();
+    $("chart-empty").hidden = valid.length > 0;
+    function add(tag, attrs, content) { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, String(v))); if (content != null) el.textContent = content; svg.append(el); return el; }
+    if (!valid.length) { text("timing-average", "—"); text("timing-max", "—"); return; }
+    const vals = valid.map((r) => r.elapsed_ms), peak = Math.max(...vals), avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    text("timing-average", number(Math.round(avg))); text("timing-max", number(Math.round(peak)));
+    const yTop = Math.max(100, Math.ceil(peak * 1.15 / 100) * 100);
+    const left = 55, right = 635, top = 10, base = 106;
+    for (const fraction of [0, .5, 1]) {
+      const y = base - (base - top) * fraction;
+      add("path", {d:`M${left},${y}H${right}`, class:"chart-grid"});
+      add("text", {x:left - 10, y:y + 4, "text-anchor":"end"}, number(Math.round(yTop * fraction)));
+    }
+    const points = valid.map((r, i) => [valid.length === 1 ? (left + right) / 2 : left + (right - left) * i / (valid.length - 1), base - (base - top) * r.elapsed_ms / yTop]);
+    const d = points.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ");
+    if (points.length > 1) add("path", {d:d + `L${points.at(-1)[0]},${base}L${points[0][0]},${base}Z`, class:"chart-fill"});
+    add("path", {d, class:"chart-line"});
+    points.forEach(([x,y], i) => { add("circle", {cx:x, cy:y, r:3, class:"chart-point" + (valid[i].late ? " late" : "")}); });
+    const indices = [...new Set([0, Math.floor((valid.length - 1) / 2), valid.length - 1])];
+    indices.forEach((i) => add("text", {x:points[i][0], y:129, "text-anchor":"middle"}, `R${String(valid[i].number).padStart(2,"0")}`));
+  }
+  function setFeed(data, stale, message) {
+    stage.classList.toggle("stale", stale);
+    const el = $("feed-status");
+    el.replaceChildren(document.createElement("i"), document.createTextNode(message));
+    el.className = "feed-status " + (stale ? "warning" : "live");
+    $("connection-banner").hidden = !stale;
+    text("banner-title", snapshot ? "展板数据已暂停更新" : "尚未连接展板服务");
+    text("banner-description", snapshot ? "正在自动重连。下方仅保留上次记录，不代表当前比赛实时状态。" : "请先启动裁判服务端。此页面不会自行生成比赛数据。");
+    renderConnection(data, stale);
+  }
+  function render(data, stale = false, message = "") {
+    const session = data?.session;
+    if (data) {
+      text("event-title", data.title); text("event-subtitle", data.subtitle);
+      $("event-title").title = data.title;
+      document.title = `${data.title} · 现场展板`;
+    }
+    text("team-name", session?.team || "等待场次建立"); $("team-name").title = session?.team || "";
+    text("competition-name", competitionNames[session?.competition] || "尚未选择赛项");
+    const purpose = {PRACTICE: "练习联调", OFFICIAL: "正式比赛", LEGACY: "旧版未分类"}[session?.mode];
+    text("contest-label", purpose ? `竞赛项目 · ${purpose}` : "竞赛项目");
+    text("round-number", data?.latest ? String(data.latest.number).padStart(3, "0") : "—");
+    renderHero(data, stale);
+    const counts = data?.counts || {};
+    for (const key of ["total","received","ok","ng"]) text(`count-${key}`, number(counts[key] || 0));
+    text("receipt-note", `超时未收 ${counts.timeout || 0} · 迟到 ${counts.late || 0}`);
+    text("round-goal", `已接收 ${counts.received || 0} / 10 · 非连续测试判定`);
+    $("progress-fill").style.width = `${Math.min(100, (counts.received || 0) * 10)}%`;
+    renderTable(data?.recent || []); renderChart(data?.timings || []);
+    setFeed(data, stale, message || (demo ? "界面演示 · 模拟数据，不计入比赛" : `展板在线 · 更新于 ${clockTime(data?.generated_utc)}`));
+  }
+  function markStale(message) {
+    fresh = false;
+    renderHero(snapshot, true);
+    setFeed(snapshot, true, message);
+  }
+  async function poll() {
+    if (demo || pollInProgress) return;
+    pollInProgress = true;
+    clearTimeout(pollTimer);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1800);
+    try {
+      const response = await fetch("/api/display", {cache:"no-store", credentials:"omit", signal:controller.signal});
+      if (!response.ok) throw new Error("http");
+      const packet = await response.json();
+      if (!packet.available || !packet.data || packet.data.schema !== 1 || packet.data.demo !== false) throw new Error("schema");
+      // Do not refresh the apparent live age from stale responses or stalled publishers.
+      if (packet.stale || packet.age_ms > 2500 || packet.age_ms == null) { markStale("展板快照已过期 · 自动重连中"); return; }
+      snapshot = packet.data; fresh = true; lastFreshAt = performance.now() - Math.max(0, packet.age_ms);
+      render(snapshot);
+    } catch (_) { markStale("展板连接中断 · 自动重连中"); }
+    finally { clearTimeout(timeout); pollInProgress = false; pollTimer = setTimeout(poll, 500); }
+  }
+
+  // Isolated preview dataset: embedded only in explicitly marked local HTML mode.
+  // Live pages never call this function and never display these values on failure.
+  function makeDemo() {
+    const now = new Date();
+    const timings = [732, 688, 854, 705, 643, 791, 667, 719, 610, 682, 704, 628];
+    const results = ["OK", "NG", "OK", "OK", "NG", "OK", "OK", "NG", "OK", "OK", "NG", "OK"];
+    const variants = ["OK", "NG", "WAITING", "TIMEOUT", "DISCONNECTED", "LATE", "CANCELLED", "INTERRUPTED"];
+    const variant = variants[demoStep % variants.length];
+    if (variant === "NG") results[11] = "NG";
+    let rows = results.map((actual, i) => ({number:i + 1, status:"RECEIVED", actual, elapsed_ms:timings[i], timeout_ms:0, started_utc:new Date(now.getTime() - (12-i)*18000).toISOString(), received_utc:new Date(now.getTime() - (12-i)*18000 + timings[i]).toISOString()}));
+    if (["WAITING","TIMEOUT","CANCELLED","INTERRUPTED"].includes(variant)) {
+      rows.push({number:13, status:variant, actual:null, elapsed_ms:variant === "WAITING" ? performance.now() - demoStarted : null, timeout_ms: variant === "TIMEOUT" ? 2000 : 0, started_utc:now.toISOString(), received_utc:null});
+    }
+    if (variant === "LATE") rows[11] = {...rows[11], status:"LATE", actual:"NG", elapsed_ms:2410, timeout_ms:2000};
+    const done = rows.filter((r) => r.actual != null);
+    return {schema:1, demo:true, title:"工业视觉技能竞赛", subtitle:"双赛项现场展示 · 以视觉见实力", generated_utc:now.toISOString(), session:{display_id:"DEMO_ONLY",team:"智视先锋队 · 03",competition:demoMode}, connection:{listening:true,connected:variant !== "DISCONNECTED",ready:variant !== "DISCONNECTED",fault:false}, counts:{total:rows.length,received:done.length,ok:done.filter((r) => r.actual === "OK").length,ng:done.filter((r) => r.actual === "NG").length,timeout:variant === "TIMEOUT" ? 1 : 0,late:variant === "LATE" ? 1 : 0}, latest:rows.at(-1), recent:[...rows].reverse().slice(0,6), timings:done.map((r) => ({number:r.number,elapsed_ms:r.elapsed_ms,late:r.status === "LATE"}))};
+  }
+  function showDemo() { snapshot = makeDemo(); fresh = true; lastFreshAt = performance.now(); render(snapshot); }
+  function nextDemo() { demoStep += 1; demoStarted = performance.now(); showDemo(); }
+
+  window.addEventListener("resize", fit);
+  document.addEventListener("mousemove", showToolbar);
+  document.addEventListener("touchstart", showToolbar, {passive:true});
+  document.addEventListener("keydown", (event) => {
+    if (event.key.toLowerCase() === "f" && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); fullscreen(); }
+    if (event.key === "Tab") showToolbar();
+  });
+  document.addEventListener("fullscreenchange", updateFullscreenButton);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !demo) { if (performance.now() - lastFreshAt > 2500) markStale("正在恢复展板连接"); poll(); } });
+  window.addEventListener("online", () => { if (!demo) poll(); });
+  window.addEventListener("offline", () => { if (!demo) markStale("网络已断开 · 自动重连中"); });
+  $("fullscreen-button").addEventListener("click", fullscreen);
+  $("contrast-button").addEventListener("click", toggleContrast);
+  try { if (localStorage.getItem("vision-display-theme") === "light") toggleContrast(); } catch (_) {}
+  fit(); updateClock(); showToolbar();
+  setInterval(updateClock, 1000);
+  setInterval(() => {
+    if (!demo && fresh && performance.now() - lastFreshAt > 2500) markStale("展板数据已过期 · 自动重连中");
+    if (fresh && elapsedBase != null) setElapsed(elapsedBase + performance.now() - elapsedAt);
+  }, 100);
+  if (demo) {
+    $("demo-badge").hidden = false; $("demo-controls").hidden = false;
+    $("demo-mode").addEventListener("click", () => { demoMode = demoMode === "packaging" ? "screw" : "packaging"; showDemo(); });
+    $("demo-next").addEventListener("click", nextDemo);
+    $("demo-pause").addEventListener("click", () => { demoPaused = !demoPaused; text("demo-pause", demoPaused ? "继续演示" : "暂停演示"); });
+    showDemo(); setInterval(() => { if (!demoPaused) nextDemo(); }, 6500);
+  } else { render(null, true, "正在连接展板服务"); poll(); }
+})();
+
+</script>
+</body>
+</html>

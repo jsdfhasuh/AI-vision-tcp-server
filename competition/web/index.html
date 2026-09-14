@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="vision-display-mode" content="live">
+<meta name="color-scheme" content="dark light">
+<title>工业视觉技能竞赛 · 现场展板</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<div class="stage" id="stage">
+  <header class="masthead">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16"/><path d="M14 26V14h12m12 0h12v12m0 12v12H38m-12 0H14V38"/><circle cx="32" cy="32" r="10"/><circle class="pupil" cx="32" cy="32" r="3"/></svg>
+      <div class="brand-copy"><div class="eyebrow">VISION SKILLS <span class="divider">/</span> 现场比赛展板</div><h1 id="event-title">工业视觉技能竞赛</h1><p id="event-subtitle">双赛项现场展示 · 以视觉见实力</p></div>
+    </div>
+    <div class="header-right"><span class="demo-badge" id="demo-badge" hidden>界面演示 · 非比赛数据</span><div class="clock-wrap"><time id="clock">--:--:--</time><div id="date">----年--月--日</div></div></div>
+  </header>
+
+  <section class="session-strip" aria-label="参赛场次">
+    <div class="team-block"><span class="section-label">当前参赛队伍</span><strong id="team-name">等待场次建立</strong></div>
+    <div class="contest-block"><span class="section-label" id="contest-label">竞赛项目</span><strong id="competition-name">尚未选择赛项</strong></div>
+    <div class="round-block"><span class="section-label">当前轮次</span><strong><span id="round-number">—</span><small>轮</small></strong></div>
+    <div class="link-block"><span class="status-pill" id="client-status"><i></i><span>等待连接</span></span><span id="client-description">等待服务端状态</span></div>
+  </section>
+
+  <main class="main-grid">
+    <section class="hero panel" id="hero" data-state="idle" aria-label="实时检测结果">
+      <div class="hero-top"><span class="section-label" id="result-heading">当前检测结果</span><span class="outline-pill" id="result-source">等待实时数据</span></div>
+      <div class="hero-center"><div class="verdict-copy"><div class="result-value" id="result-value" role="status" aria-live="polite">—</div><div class="result-description" id="result-description">准备就绪，等待比赛开始</div><div class="result-detail" id="result-detail">展板只展示结果，不参与视觉检测与裁判评分。</div></div><div class="result-orbit" aria-hidden="true"><div class="orbit-grid"></div><svg viewBox="0 0 180 180"><circle class="orbit-outer" cx="90" cy="90" r="84"/><circle class="orbit-inner" cx="90" cy="90" r="64"/><path id="state-icon" d="M60 90h60"/><circle class="orbit-dot" cx="90" cy="6" r="4"/></svg></div></div>
+      <div class="hero-bottom"><div><span class="section-label">本轮观测耗时</span><strong id="elapsed">—<small> ms</small></strong></div><div><span class="section-label">结果接收状态</span><strong class="status-text" id="receipt-status">尚无记录</strong></div><div class="last-time"><span class="section-label">结果接收时间</span><strong class="status-text" id="received-time">—</strong></div></div>
+    </section>
+    <section class="metrics" aria-label="本场结果统计">
+      <article class="metric panel"><div class="metric-head"><span>本场已发起轮次</span><span class="metric-icon">#</span></div><strong id="count-total">0</strong><div class="metric-foot"><span id="round-goal">结果接收参考 · 非连续测试判定</span></div><div class="progress-track"><div id="progress-fill"></div></div></article>
+      <article class="metric panel"><div class="metric-head"><span>已接收结果</span><span class="metric-icon">↙</span></div><strong id="count-received">0</strong><div class="metric-foot" id="receipt-note">超时未收 0 · 迟到 0</div></article>
+      <article class="metric panel metric-ok"><div class="metric-head"><span>客户端输出 OK</span><span class="mini-pill">OK</span></div><strong id="count-ok">0</strong><div class="metric-foot">产品合格判定次数</div></article>
+      <article class="metric panel metric-ng"><div class="metric-head"><span>客户端输出 NG</span><span class="mini-pill">NG</span></div><strong id="count-ng">0</strong><div class="metric-foot">产品不合格判定次数 · 非扣分数</div></article>
+    </section>
+  </main>
+
+  <section class="bottom-grid">
+    <article class="records panel"><div class="panel-title"><h2>最近轮次</h2><span>按测试轮次排序 · 最近 6 轮</span></div><table><thead><tr><th>轮次</th><th>客户端结果</th><th>接收状态</th><th class="right">观测耗时</th><th class="right">接收时间</th></tr></thead><tbody id="records-body"></tbody></table><div id="records-empty" class="empty-records">尚无测试记录<span>裁判开始本轮后，这里将自动更新。</span></div></article>
+    <article class="trend panel"><div class="panel-title"><h2>服务端观测耗时</h2><span>最近 20 轮中的已接收结果</span></div><div class="chart-summary"><span>平均 <strong id="timing-average">—</strong><small> ms</small></span><span>峰值 <strong id="timing-max">—</strong><small> ms</small></span><span class="legend"><i></i>单轮耗时</span></div><div class="chart-area"><svg id="timing-chart" viewBox="0 0 650 132" role="img" aria-label="最近轮次的服务端观测耗时折线图"></svg><div id="chart-empty">等待有效耗时记录</div></div><p class="timing-caption">计时：服务端开始本轮 → 完整结果进入处理；不是纯推理耗时。</p></article>
+  </section>
+
+  <footer><span class="feed-status" id="feed-status"><i></i>正在连接展板服务</span><span class="disclaimer">OK / NG 仅代表参赛软件的产品判定，不代表裁判评分。</span><span class="readonly-label">只读展示 · 不公开预设答案</span></footer>
+
+  <div class="connection-banner" id="connection-banner" hidden role="alert"><span class="banner-icon">!</span><div><strong id="banner-title">展板连接中断</strong><p id="banner-description">已停止实时显示，正在重新连接。下方保留记录不是当前实时状态。</p></div></div>
+  <div class="toolbar" id="toolbar"><span class="toolbar-label">展板设置</span><button id="contrast-button" type="button" title="切换浅色高亮主题" aria-label="切换浅色高亮主题">明亮模式</button><button id="fullscreen-button" type="button" title="全屏 / F" aria-label="全屏展示">⛶ 全屏</button><span class="demo-controls" id="demo-controls" hidden><button id="demo-mode" type="button">切换赛项</button><button id="demo-next" type="button">下一状态</button><button id="demo-pause" type="button">暂停演示</button></span></div>
+  <div id="toast" class="toast" hidden role="status"></div>
+</div>
+<noscript>展板需要启用浏览器 JavaScript。裁判 TCP 服务端不受影响。</noscript>
+</body>
+</html>
