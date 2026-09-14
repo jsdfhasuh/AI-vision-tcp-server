@@ -1,0 +1,46 @@
+# Local runtime data and private referee information
+/data/
+/backups/
+/exports/
+/logs/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.lock
+*.log
+.env
+.env.*
+!.env.example
+/settings.json
+
+# Python / local build environments
+__pycache__/
+*.py[cod]
+.venv/
+.venv-build/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.spec
+*.egg-info/
+
+# Generated screenshots and local test evidence
+/docs/gui_preview.png
+/docs/screenshots/*.png
+/tests/*.err
+/tests/*.json
+/tests/*test_run*.txt
+/tests/test_run*.txt
+/RELEASE_MANIFEST.json
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
