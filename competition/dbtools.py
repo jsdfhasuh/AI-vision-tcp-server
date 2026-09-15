@@ -142,7 +142,9 @@ def backup_database(source: Path, parent: Path, *, reason: str = "manual",
         info = inspect_database(temp)
         if not info["integrity_ok"]:
             raise ValueError("备份完整性检查失败，未生成成功备份。")
-        with temp.open("rb") as f:
+        # Windows fsync requires a writable handle; r+b preserves the backup bytes.
+        with temp.open("r+b") as f:
+            f.flush()
             os.fsync(f.fileno())
         temp.replace(target)
         manifest = {"format": "vision-competition-backup-v1", "created_utc": timestamp(),
