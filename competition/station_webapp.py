@@ -22,6 +22,7 @@ from .web_auth import Auth, COOKIE, Login, LoginLimited
 from .web_config import WebConfig
 from .station_protocol import ProtocolError, plain
 from .station_runtime import StationRuntime
+from .standard_json import EXAMPLE_STANDARD, parse_standard_json
 from .storage import csv_safe
 
 ROOT = Path(__file__).resolve().parent
@@ -133,6 +134,24 @@ def create_app(config: WebConfig) -> FastAPI:
             raise HTTPException(503, '服务异常，暂不能修改配置。')
         return runtime.store.set_standard(payload['barcode'], payload['revision'],
                                           request.headers.get('x-request-id', ''), identity.username)
+
+    @app.post('/api/admin/standard-barcode/import')
+    def import_standard(request: Request, payload: dict = Body(...), identity: Login = Depends(auth_required)):
+        if set(payload) != {'content', 'revision'}:
+            raise ValueError('仅接受 JSON 文件内容 content 和当前标准版本 revision。')
+        barcode = parse_standard_json(payload['content'])
+        runtime = app.state.runtime
+        if not runtime.healthy:
+            raise HTTPException(503, '服务异常，暂不能导入配置。')
+        # Existing history and idempotency apply; no file path or original file is stored.
+        return runtime.store.set_standard(barcode, payload['revision'],
+                                          request.headers.get('x-request-id', ''), identity.username)
+
+    @app.get('/api/admin/standard-barcode/template')
+    def standard_template(identity: Login = Depends(auth_required)):
+        return Response(json.dumps(EXAMPLE_STANDARD, ensure_ascii=False, indent=2) + '\n',
+                        media_type='application/json',
+                        headers={'Content-Disposition': 'attachment; filename="standard-barcode.example.json"'})
 
     @app.get('/api/admin/records')
     def records(project: str, station: int = 0, before: int = 0, limit: int = 100,

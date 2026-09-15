@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const publicView = location.pathname.startsWith('/board');
   const model = {project:'screw', csrf:'', loggedIn:false, epoch:0, timer:null, controller:null,
-    snapshot:null, online:false, standard:null, formRevision:null, dirty:false, saving:false};
+    snapshot:null, online:false, standard:null, formRevision:null, dirty:false, saving:false, importContent:null, reading:false, fileReadId:0};
   const matches = {MATCH:'匹配', MISMATCH:'不匹配', UNCONFIGURED:'未配置标准', UNREAD:'未读取条码'};
   let toastTimer;
   function node(tag, text, cls) { const e=document.createElement(tag); if(text!=null)e.textContent=String(text);if(cls)e.className=cls;return e; }
@@ -29,6 +29,7 @@
   function stopPoll(){model.epoch++;clearTimeout(model.timer);model.controller?.abort();}
   function showLogin(message='') {
     stopPoll();model.loggedIn=false;model.csrf='';model.snapshot=null;model.online=false;model.standard=null;model.formRevision=null;model.dirty=false;
+    resetImport();model.saving=false;
     $('standard-barcode').value='';$('stations').replaceChildren();$('records-body').replaceChildren();$('logs-body').replaceChildren();
     $('app-screen').hidden=true;$('login-screen').hidden=false;$('login-error').textContent=message;
     $('login-form').elements.password.value='';
@@ -43,7 +44,8 @@
   }
   function updateControls(){
     const locked=!model.online||!model.loggedIn||model.saving||!!model.snapshot?.fatal;
-    $('save-standard').disabled=locked||model.formRevision===null;
+    $('standard-file').disabled=locked||model.formRevision===null;
+    $('save-standard').disabled=locked||model.reading||model.importContent===null||model.formRevision===null;
     $('reload-standard').disabled=!model.standard||model.saving;
     $('backup').disabled=locked;
   }
@@ -92,8 +94,9 @@
   }
   function applyStandard(){
     if(!model.standard)return;
+    resetImport();
     $('standard-barcode').value=model.standard.barcode;model.formRevision=model.standard.revision;model.dirty=false;
-    $('standard-note').textContent='服务器标准版本 '+model.formRevision+' · 两个包装箱工位共用；留空保存表示未配置。';
+    $('standard-note').textContent='服务器标准版本 '+model.formRevision+' · 两个包装箱工位共用；JSON 导入后保存在服务器，重启仍有效。';
   }
   function render(snapshot){
     model.snapshot=snapshot;model.online=true;
@@ -101,7 +104,7 @@
     $('listen-state').textContent=publicView?'只读数据接口':'TCP · '+snapshot.listening;
     $('updated-at').textContent='更新于 '+stamp(snapshot.generated_utc);
     $('connection-alert').hidden=true;$('fatal-alert').hidden=!snapshot.fatal;$('fatal-alert').textContent=snapshot.fatal||'';
-    if(snapshot.standard){model.standard=snapshot.standard;if(!model.dirty&&!model.saving)applyStandard();else if(model.formRevision!==snapshot.standard.revision)$('standard-note').textContent='服务器标准已更新。未覆盖你的输入；请重新载入后确认。';}
+    if(snapshot.standard&&(!model.standard||snapshot.standard.revision>=model.standard.revision)){model.standard=snapshot.standard;if(!model.dirty&&!model.saving)applyStandard();else if(model.formRevision!==snapshot.standard.revision)$('standard-note').textContent='服务器标准已更新。未覆盖待导入文件；请重新载入并重新选择文件。';}
     $('stations').replaceChildren(...snapshot.stations.map(stationCard));renderTables();updateControls();
   }
   async function refresh(epoch){
@@ -123,14 +126,53 @@
   }
   document.querySelectorAll('[data-project]').forEach(b=>b.addEventListener('click',()=>selectProject(b.dataset.project)));
   $('station-filter').addEventListener('change',renderTables);$('issues-only').addEventListener('change',renderTables);
-  $('standard-barcode').addEventListener('input',()=>{model.dirty=true;});
-  $('reload-standard').addEventListener('click',()=>{if(!model.dirty||confirm('放弃未保存输入，重新载入服务器标准？')){applyStandard();updateControls();}});
+  function resetImport(){
+    model.fileReadId++;model.importContent=null;model.reading=false;
+    $('standard-file').value='';
+    $('file-status').textContent='UTF-8 JSON，最多4 KiB；选择文件后预览，点击导入才生效。';
+  }
+  $('standard-file').addEventListener('change',async()=>{
+    const file=$('standard-file').files[0], readId=++model.fileReadId;
+    model.importContent=null;model.reading=false;model.dirty=!!file;
+    $('standard-barcode').value=model.standard?.barcode??'';
+    if(!file){applyStandard();updateControls();return;}
+    model.reading=true;updateControls();
+    $('file-status').textContent='正在读取 '+file.name+' …';
+    try {
+      if(!/\.json$/i.test(file.name)||file.size===0||file.size>4096)throw new Error('请选择非空的 .json 文件，最多4 KiB。');
+      const raw=await file.arrayBuffer();
+      if(readId!==model.fileReadId||!model.loggedIn)return;
+      const content=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(raw);
+      const data=JSON.parse(content.replace(/^\uFEFF/,''));
+      if(!data||Array.isArray(data)||Object.keys(data).length!==1||!Object.hasOwn(data,'standard_barcode'))throw new Error('JSON 只能包含 standard_barcode 一个字段。');
+      if(typeof data.standard_barcode!=='string'||[...data.standard_barcode].length>512||/[\u0000-\u001f\u007f]/.test(data.standard_barcode))throw new Error('条码必须是字符串，最多512个字符且不能含控制字符，不能填数字。');
+      // Preview only. The server strictly parses the original text again, including duplicate-key checks.
+      model.importContent=content;$('standard-barcode').value=data.standard_barcode;
+      $('file-status').textContent='待导入：'+file.name+' · 尚未生效'+(data.standard_barcode===''?' · 空字符串将清除标准':'');
+    } catch(err){
+      if(readId!==model.fileReadId||!model.loggedIn)return;
+      model.importContent=null;model.dirty=false;
+      $('file-status').textContent='文件未导入，原标准未改变。'+err.message;
+      toast($('file-status').textContent,true);
+      $('standard-file').value='';
+    } finally {
+      if(readId===model.fileReadId){model.reading=false;updateControls();}
+    }
+  });
+  $('reload-standard').addEventListener('click',()=>{if(!model.dirty||confirm('放弃待导入文件，重新载入服务器标准？')){applyStandard();updateControls();}});
   $('barcode-form').addEventListener('submit',async e=>{
     e.preventDefault();if($('save-standard').disabled)return;
+    if($('standard-barcode').value===''&&!confirm('文件中的条码为空。确认清除标准并暂停条码匹配校验？'))return;
+    const identity=model.csrf, barcode=$('standard-barcode').value;
     model.saving=true;updateControls();
-    try {await api('/api/admin/standard-barcode',{method:'POST',body:{barcode:$('standard-barcode').value,revision:model.formRevision}});model.dirty=false;toast('标准条码已保存，仅用于服务器比对。');}
-    catch(err){if(err.status===401)showLogin('登录已过期。');else toast(err.message,true);}
-    finally {model.saving=false;updateControls();}
+    try {
+      const result=await api('/api/admin/standard-barcode/import',{method:'POST',body:{content:model.importContent,revision:model.formRevision}});
+      if(!model.loggedIn||identity!==model.csrf)return;
+      if(!model.standard||model.standard.revision<=result.revision)model.standard={barcode,revision:result.revision};
+      applyStandard();toast('JSON 已导入并生效，仅用于服务器比对。');
+    }
+    catch(err){if(model.loggedIn&&identity===model.csrf){if(err.status===401)showLogin('登录已过期。');else toast(err.message,true);}}
+    finally {if(identity===model.csrf){model.saving=false;updateControls();}}
   });
   $('login-form').addEventListener('submit',async e=>{e.preventDefault();const b=e.currentTarget.querySelector('button');b.disabled=true;$('login-error').textContent='';try{start(await api('/api/auth/login',{method:'POST',body:Object.fromEntries(new FormData(e.currentTarget))}));}catch(err){$('login-error').textContent=err.message;}finally{b.disabled=false;}});
   $('logout').addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST',body:{}});showLogin();}catch(err){toast('退出未确认：'+err.message,true);}});

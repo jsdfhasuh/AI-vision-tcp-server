@@ -26,9 +26,15 @@
     <div id="fatal-alert" class="alert" hidden role="alert"></div>
     <section class="heading"><div><p id="page-number" class="eyebrow">PROJECT 01</p><h1 id="page-title">电机螺钉项目</h1><p id="page-description" class="muted">接收检测到的螺钉数量，工号仅标明当前操作者。</p></div><div class="service-state"><span id="web-state" class="badge neutral">连接中</span><small id="listen-state">等待服务端</small><small id="updated-at">—</small></div></section>
     <section id="barcode-config" class="panel config" hidden>
-      <div class="section-title"><h2>标准条码配置</h2><span class="muted">仅供服务器比对，不下发到工位</span></div>
-      <form id="barcode-form"><label>完整标准条码<input id="standard-barcode" maxlength="512" autocomplete="off" spellcheck="false" placeholder="录入完整标准条码，保留前导零与大小写"></label><button id="save-standard" class="primary" type="submit">保存标准条码</button><button id="reload-standard" type="button" class="secondary">重新载入</button></form>
-      <p id="standard-note" class="muted small-text">两个包装箱工位使用同一标准；留空保存表示未配置。</p>
+      <div class="section-title"><h2>标准条码 · JSON 导入</h2><span class="muted">仅供服务器比对，不下发到工位</span><a class="secondary" href="/api/admin/standard-barcode/template" download>下载 JSON 示例</a></div>
+      <form id="barcode-form">
+        <label>选择本地 JSON 文件<input id="standard-file" type="file" accept=".json,application/json" aria-describedby="file-status" disabled></label>
+        <button id="save-standard" class="primary" type="submit" disabled>导入并生效</button>
+        <button id="reload-standard" type="button" class="secondary">取消选择 / 重新载入</button>
+      </form>
+      <p id="file-status" class="muted small-text" role="status">UTF-8 JSON，最多4 KiB；选择文件后预览，点击导入才生效。</p>
+      <label>完整标准条码（当前值 / 待导入预览）<input id="standard-barcode" readonly autocomplete="off" spellcheck="false" placeholder="尚未配置标准条码"></label>
+      <p id="standard-note" class="muted small-text">两个包装箱工位共用；文件只含 standard_barcode 字符串。</p>
     </section>
     <section id="stations" class="stations" aria-label="工位实时数据"></section>
     <section class="panel records"><div class="section-title"><div><h2 id="records-title">检测记录（电机螺钉）</h2><p class="muted small-text">最近 100 条；切换项目不影响其他工位接收。</p></div><div class="record-actions"><label class="inline">工位<select id="station-filter"><option value="0">全部工位</option><option value="1">1号工位</option><option value="2">2号工位</option></select></label><label id="issues-control" class="inline" hidden><input id="issues-only" type="checkbox">仅不匹配 / NG</label><a id="export-csv" class="secondary" download>导出 CSV</a><a id="export-jsonl" class="secondary" download>导出原始记录</a></div></div>
