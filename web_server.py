@@ -10,7 +10,7 @@ from competition.web_config import WebConfig
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='视觉比赛纯Web服务端（单实例）')
+    parser = argparse.ArgumentParser(description='视觉比赛四工位 TCP / Web 服务端')
     parser.add_argument('--data-dir', type=Path)
     parser.add_argument('--host')
     parser.add_argument('--port',type=int)
@@ -18,7 +18,10 @@ def main() -> None:
     parser.add_argument('--tcp-port',type=int)
     parser.add_argument('--public-url')
     parser.add_argument('--credentials',type=Path)
+    parser.add_argument('--legacy-v1', action='store_true', help='显式启动旧版单场次协议；不接收v2数据')
     args = parser.parse_args()
+    legacy = args.legacy_v1
+    del args.legacy_v1
     # Disallow accidental process replication against an in-memory match engine.
     for name in ('WEB_CONCURRENCY','UVICORN_WORKERS'):
         if os.getenv(name,'1') != '1':
@@ -30,7 +33,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     try:
         import uvicorn
-        from competition.webapp import create_app
+        if legacy:
+            from competition.webapp import create_app
+        else:
+            from competition.station_webapp import create_app
     except ImportError as exc:
         parser.error('请先安装 requirements-web.txt 中的Web依赖：' + str(exc))
     uvicorn.run(create_app(config), host=config.host, port=config.port, workers=1,

@@ -1,83 +1,95 @@
-# 视觉比赛 TCP 服务端 · v1.3.0-web
+# 视觉比赛 TCP 服务器 · v1.4.0-stations
 
-**纯 Web 裁判后台 + 只读现场大屏 + TCP v1 + SQLite + Docker 构建配置。**
+面向 **两个项目、每项目两个工位** 的 TCP 数据接收与 Web 展示程序。服务器不负责排赛、建立测试轮次、自动评分或排名。
 
-服务器不再需要桌面、Tkinter、VNC 或 noVNC。裁判用浏览器操作 `/admin/`，观众访问 `/board/`；两者使用不同的数据接口。比赛状态机、TCP 协议和 schema v2 数据库沿用 v1.2.0-db。旧 Windows 桌面入口 `server.py` / `start_server.cmd` 仍保留，其界面版本仍为 1.2.0-db。
+| 项目页 | 参赛端上传的业务数据 | 服务端处理 |
+|---|---|---|
+| 电机螺钉（1、2号工位） | 当前选手工号、螺钉数量 | 记录数量；不自行推断缺钉位置或判定 NG |
+| 包装箱检查（1、2号工位） | 当前选手工号、完整条码、LOGO OK/NG、火焰标识 OK/NG | 完整条码与预录标准精确比较；另两项原样记录 |
 
-本版从仓库 `main` 的 `1d3992d6f06def52b1221a6e557d5b6dc164eeab` 开发。**交付物是完整源码和 Docker 构建配置，不是已经发布的镜像；本次没有修改远端仓库，也没有部署到 Oracle。**
+**工号只是操作者标识，不是登录认证，也不用于创建比赛场次。** 型号判断只靠标签上的完整条码比对，不识别印刷型号文字。LOGO、火焰标识均不细分缺陷原因。三个包装箱结果独立保存，无自动综合判定。
 
-## 首次部署
+## 启动与更新
 
-见 **[Oracle / Docker 部署指南](docs/DOCKER_ORACLE.md)**。指南包含首次创建管理员、目录权限、SSH 隧道、HTTPS 反向代理、升级和恢复。不要跳过密码文件初始化，直接运行 `docker compose up`。
+默认入口现在启动新四工位接收器：
 
-安全默认值：网页和参赛 TCP 只发布到服务器的 `127.0.0.1`；通过 SSH 隧道联调。管理员没有默认密码；本地初始化工具只保存加盐密码哈希。实际数据目录与镜像分离。
-
-```text
-裁判浏览器 → /admin/ → 登录 / CSRF / 状态校验 → 同一个比赛引擎
-参赛软件   → TCP 9000 → JSON Lines v1        → 同一个比赛引擎 → SQLite
-观众浏览器 → /board/ → /api/display         → 仅白名单公开快照
-```
-
-## 已实现
-
-| 模块 | 能力 |
-|---|---|
-| 网页裁判 | 新建练习/正式场次、选择赛项、指定箱型、查看接入码、开始/取消轮次、结束场次 |
-| 检测记录 | 预期与实际分别显示，NG 可以是正确判断；未收到/超时/中断不会自动补 NG |
-| 操作保护 | 登录、HttpOnly 会话 Cookie、同源/CSRF 检查、请求编号去重、旧页面状态拒绝 |
-| 历史与维护 | 只读历史分页、后台备份/导出/完整性检查、登录后下载结果 |
-| 大屏 | 沿用公开白名单，不返回裁判预期、样件类别、接入码、备注和内部原始日志 |
-| 容器 | 单进程、非 root、只读根文件系统、数据挂载、健康检查、正常停机清理 |
-
-一个实例同一时间只管理一个活动场次。包装箱和螺钉赛项切换时新建场次。**不是多赛道并发调度系统，也不是多管理员权限系统。** 多浏览器可以访问同一后台，但共享一个管理员身份和引擎。
-
-## 非 Docker 的本机开发
-
-Web 入口建议使用 Python 3.13；以下依赖锁按该运行环境验证。Windows 原桌面运行方式不受影响。
-
-```bash
-python -m venv .venv
-# Linux: source .venv/bin/activate
-# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+```powershell
 python -m pip install -r requirements-web.txt
+# 首次部署才执行；已经有 secrets/admin.json 时不要覆盖。
 python tools/init_web_admin.py
 python web_server.py
 ```
 
-浏览器使用配置中的**准确主机名**：默认 `http://localhost:9080/admin/` 和 `http://localhost:9080/board/`。默认配置下不要改用 `127.0.0.1` 作为浏览器地址，否则 Host 校验会拒绝。参赛软件连接 `127.0.0.1:9000`。
+管理端：`http://localhost:9080/admin/`；只读展板：`http://localhost:9080/board/`。在顶部页签切换电机螺钉与包装箱检查。TCP 默认监听 `127.0.0.1:9000`，按报文中的项目和工位区分四路，切页面不会断开另一项目的 TCP 连接。
 
-创建场次 → 设置箱型 → 查看接入码 → 运行 `client_example.py --help` 或原 `start_mock_client.cmd` → 客户端握手并确认目标版本 → 开始本轮 → 自动接收最终 OK/NG。先用模拟器联调，再接真实视觉程序。
+在包装箱管理页保存完整标准条码。**两个包装箱工位共用当前标准，标准不会下发给参赛端。** 空标准表示未配置。每条包装箱记录保存当时的标准快照；修改标准不会重新判定历史记录。
 
-`.env` 由 Docker Compose 读取；直接运行 Python 不会自动加载 `.env`，请设置系统环境变量或使用 `web_server.py --help` 中的参数。
+已有数据、凭据和配置目录请原样保留。更新前先停旧服务、备份数据，再拉取代码并启动，避免同一端口被重复监听。非默认端口时需同时设置 `--port` 与匹配的 `--public-url`。
 
-## 数据与兼容性
-
-数据在 `/data/competition.sqlite3` 及其附属目录中；凭据单独挂载到 `/run/secrets/admin.json`。不能让桌面版和 Web 版同时写同一数据库，也不能用多 worker 或多个容器共享同一个活动比赛引擎。
-
-切场/结束场次自动排队备份，正常退出尽力完成最终备份；失败写日志，不假装完成。启动后未完成的旧轮次标记中断，不恢复旧计时。维护任务列表保存在内存，重启后清空，但已生成文件仍在磁盘。没有自动删除证据/备份的功能，需要裁判按制度归档。
-
-数据库包含裁判私有数据和参赛接入码，**未加密**；密码哈希文件不在数据库备份内。原 TCP v1 仍是明文 TCP，HTTPS 只保护网页，参赛 TCP 应经 SSH/VPN 或可信隔离网络连接。
-
-## 验证
+Docker 沿用原有目录挂载和凭据初始化方式；镜像标记更新为 `1.4.0-stations`：
 
 ```bash
-python -m pip install -r requirements-web-test.txt
-python -m unittest discover -s tests -p 'test_*.py' -v
-python tests/web_http_smoke.py --output-dir /tmp/vision-web-smoke
+docker compose up -d --build
+docker compose logs --tail=100 app
 ```
 
-本次 176 项自动化测试通过，另外完成两个赛项各 10 轮真实 HTTP + 独立 TCP 模拟客户端联调。实际浏览器直连被测试环境网络策略阻止；前端另外完成无网络的演示数据渲染检查，**不能把离线渲染当成端到端浏览器验收**。
+首次 Docker/Oracle 安装的账户、挂载权限、HTTPS 与 SSH 隧道配置见 [部署指南](docs/DOCKER_ORACLE.md)；其中 v1.3 的单场次操作说明不适用于新默认入口。此次没有实际构建镜像或部署 Oracle/ARM64。
 
-当前环境没有 Docker，未构建镜像，未验证 ARM64 容器、Oracle 实机、Windows 或真实相机。详见 [本版测试报告](docs/TEST_REPORT_V1_3_WEB.md)。基础镜像更新和依赖安全更新需要部署时复核；SQLite 运行时提示保留，不宣称任意发行版都已经包含 WAL 修复。
+## TCP v2 上报示例
 
-## 文档
+每个 JSON 对象一行，以真正的 LF 换行结尾；不是把字符串 `\n` 放在报文末尾。无需创建场次、获取接入码、确认目标或等待“开始本轮”。第一次完整有效上报即可绑定工位，也可以先发送 `hello`。
 
-- [Oracle / Docker 首次启动、HTTPS、数据与运维](docs/DOCKER_ORACLE.md)
-- [Web API、鉴权与操作约束](docs/WEB_API.md)
-- [v1.3 实测结果与边界](docs/TEST_REPORT_V1_3_WEB.md)
-- [TCP v1 协议](docs/PROTOCOL_V1.md)
-- [SQLite 迁移、备份与恢复](docs/DATABASE_GUIDE.md)
-- [原桌面版投屏说明](docs/DISPLAY_GUIDE.md)
-- [变更记录](CHANGELOG.md)
+电机螺钉：
 
-相机图片上传/实时视频、自动总分/排行榜、完整候场和裁判暂停流程、多赛道调度、TCP TLS 与多账户权限本版未实现。正式比赛仍建议保留现场本地部署，云端往返时间不能等同于算法耗时。
+```json
+{"v":2,"type":"result","msg_id":"unique-detection-001","project":"screw","station":1,"worker_id":"D70516","screw_count":4}
+```
+
+包装箱：
+
+```json
+{"v":2,"type":"result","msg_id":"unique-detection-002","project":"packaging","station":1,"worker_id":"D70516","barcode":"001234-AbC","logo":"OK","flame":"NG"}
+```
+
+完整字段、连续连接、心跳、重复上报和重连规则见 [TCP v2 协议](docs/PROTOCOL_V2_STATIONS.md)。ACK 仅表示数据已保存，不返回标准条码或条码核对结论。
+
+可用新示例客户端联调：
+
+```powershell
+python station_client.py --project screw --station 1 --worker-id D70516 --count 4
+python station_client.py --project packaging --station 1 --worker-id D70516 --barcode "001234-AbC" --logo OK --flame NG
+```
+
+两条命令各发送一条记录后退出；连续上报程序应维持长连接并发送心跳。**旧 `client_example.py` / `vision_client.py` 是 v1 场次协议客户端，不能直接连接新版。**
+
+## 数据与安全边界
+
+新数据保存在 `data/station-results.sqlite3`，旧 `competition.sqlite3` 不覆盖、不自动转换。新旧数据库的业务含义不同，不能把旧 OK/NG 历史伪装成新的螺钉数量、条码或火焰检查记录。
+
+管理页保留最新 100 条记录和 50 条通信日志，可按工位筛选。CSV/JSONL 导出读取全部所选项目/工位记录，不只是屏幕上的 100 条；“仅不匹配/NG”只影响页面筛选。JSONL 保留精确文本，CSV 在电子表格软件中应将工号和条码列按文本导入以保留前导零。导出内容和备份包含标准条码快照，必须保管好。
+
+新备份位于 `data/station-backups/`，通过管理页备份按钮生成独立 SQLite 文件；正常停机默认也备份（`AUTO_BACKUP=0` 可关闭）。旧 `database_tools.py` 只管理旧数据库，不要用它恢复新库。恢复新库时先停服务，在**新的空数据目录**中把独立备份复制为 `station-results.sqlite3`，使用原凭据启动验证；不要直接覆盖一个仍有 WAL/SHM 的运行目录。
+
+浏览器操作沿用管理员登录、Cookie、Origin/Host 和 CSRF 校验。标准条码、原始通信日志、来源地址只在登录后的接口提供；只读展板展示上报数据，不提供这些配置或维护操作。
+
+TCP v2 是可信隔离网络内的明文协议，没有客户端密码认证；工位号和工号不能证明发送者身份。**不要将 9000 端口直接开放到公网**，跨网使用可信 VPN/SSH 隧道，现场限制接入设备。四个工位各允许一个活动连接，后来的连接不能抢占已有工位。通信异常不补成 NG；存储故障停止接收，不虚报已保存。
+
+## 兼容与代码位置
+
+- 新业务：`competition/station_protocol.py`、`station_store.py`、`station_runtime.py`、`station_webapp.py`。
+- 新界面：`competition/monitor/`；并非先前只修改页面的 UI 骨架包。
+- 旧核心和界面保留为兼容路径；`python web_server.py --legacy-v1` 明确启动旧协议。它不是四工位接收器，不能与新入口占用同一端口。
+- `server.py` / `start_server.cmd` 仍为旧桌面入口。新版请启动 `web_server.py`。
+- 继承 `8db21f7` 的 Windows 备份 `fsync` 修复，没有覆盖掉它。
+
+## 测试
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py' -v
+python tests/station_http_smoke.py --output-dir ./test-evidence/http
+# 以下两项需可选 Playwright 与 Chromium，不是运行服务的必需依赖：
+python tests/station_frontend_render.py --output-dir ./test-evidence/offline
+python tests/station_browser_smoke.py --output-dir ./test-evidence/browser
+```
+
+本次：240 项自动化测试通过；真实 HTTP + 四个 TCP 连接完成 40 次检测和 4 次重复确认；离线浏览器 DOM 检查通过。**浏览器直接访问本地 HTTP 被测试环境策略拦截，端到端浏览器验收尚未完成**；没有把离线示例渲染当成现场实测。详见 [v1.4 测试报告](docs/TEST_REPORT_V1_4_STATIONS.md)。

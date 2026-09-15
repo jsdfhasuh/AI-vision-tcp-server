@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><title>视觉比赛 TCP 服务器</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/monitor/style.css"><script src="/monitor/app.js" defer></script>
+</head>
+<body>
+<section id="login-screen" class="login-screen" hidden>
+  <div class="login-brand"><div class="mark">V</div><p class="eyebrow">VISION · TCP MONITOR</p><h1>每一次上报，<br>都有记录。</h1><p>电机螺钉 · 包装箱检查</p><small>四工位独立接收 / 两个项目分页展示</small></div>
+  <form id="login-form" class="login-form"><p class="eyebrow">管理端登录</p><h2>视觉比赛 TCP 服务器</h2><p class="muted">使用初始化时设置的管理员账号。</p>
+    <label>用户名<input name="username" value="admin" autocomplete="username" maxlength="64" required></label>
+    <label>密码<input name="password" type="password" autocomplete="current-password" maxlength="256" required></label>
+    <p id="login-error" class="error-text" role="alert"></p><button class="primary" type="submit">登录</button>
+    <a href="/board/">打开只读展板 ↗</a>
+  </form>
+</section>
+<div id="app-screen" hidden>
+  <header class="topbar"><div class="brand"><div class="mark small">V</div><strong>视觉比赛 TCP 服务器</strong></div>
+    <nav aria-label="比赛项目"><button data-project="screw" class="tab active">01 电机螺钉</button><button data-project="packaging" class="tab">02 包装箱检查</button></nav>
+    <div class="top-actions"><span id="actor"></span><a id="board-link" href="/board/" target="_blank" rel="noopener">只读展板 ↗</a><button id="logout" class="quiet">退出</button></div>
+  </header>
+  <main>
+    <div id="connection-alert" class="alert" hidden role="alert"></div>
+    <div id="fatal-alert" class="alert" hidden role="alert"></div>
+    <section class="heading"><div><p id="page-number" class="eyebrow">PROJECT 01</p><h1 id="page-title">电机螺钉项目</h1><p id="page-description" class="muted">接收检测到的螺钉数量，工号仅标明当前操作者。</p></div><div class="service-state"><span id="web-state" class="badge neutral">连接中</span><small id="listen-state">等待服务端</small><small id="updated-at">—</small></div></section>
+    <section id="barcode-config" class="panel config" hidden>
+      <div class="section-title"><h2>标准条码配置</h2><span class="muted">仅供服务器比对，不下发到工位</span></div>
+      <form id="barcode-form"><label>完整标准条码<input id="standard-barcode" maxlength="512" autocomplete="off" spellcheck="false" placeholder="录入完整标准条码，保留前导零与大小写"></label><button id="save-standard" class="primary" type="submit">保存标准条码</button><button id="reload-standard" type="button" class="secondary">重新载入</button></form>
+      <p id="standard-note" class="muted small-text">两个包装箱工位使用同一标准；留空保存表示未配置。</p>
+    </section>
+    <section id="stations" class="stations" aria-label="工位实时数据"></section>
+    <section class="panel records"><div class="section-title"><div><h2 id="records-title">检测记录（电机螺钉）</h2><p class="muted small-text">最近 100 条；切换项目不影响其他工位接收。</p></div><div class="record-actions"><label class="inline">工位<select id="station-filter"><option value="0">全部工位</option><option value="1">1号工位</option><option value="2">2号工位</option></select></label><label id="issues-control" class="inline" hidden><input id="issues-only" type="checkbox">仅不匹配 / NG</label><a id="export-csv" class="secondary" download>导出 CSV</a><a id="export-jsonl" class="secondary" download>导出原始记录</a></div></div>
+      <div class="table-wrap"><table><thead id="records-head"></thead><tbody id="records-body"></tbody></table></div><p id="records-empty" class="empty">等待工位上传数据</p>
+    </section>
+    <section id="logs-panel" class="panel"><div class="section-title"><h2>TCP 通信日志</h2><span class="muted small-text">最近 50 条 · 接收 RX / 发送 TX · 不删除历史</span></div><div class="table-wrap"><table><thead><tr><th>时间</th><th>方向</th><th>工位</th><th>报文内容</th></tr></thead><tbody id="logs-body"></tbody></table></div><p id="logs-empty" class="empty">暂无本项目通信日志</p></section>
+    <footer><span>工号标明操作者；不进行评分、排名或型号文字识别。</span><div><span id="backup-result"></span><button id="backup" class="secondary">备份工位数据库</button><span id="readonly-label" hidden>只读展板</span></div></footer>
+  </main>
+</div><div id="toast" class="toast" role="status" hidden></div>
+<noscript>本界面需要启用 JavaScript；TCP 服务独立运行。</noscript>
+</body></html>

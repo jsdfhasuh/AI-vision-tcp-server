@@ -53,3 +53,6 @@ Thumbs.db
 *.partial
 *.tar
 *.tar.gz
+
+# Local acceptance evidence (may contain uploaded data)
+/test-evidence/

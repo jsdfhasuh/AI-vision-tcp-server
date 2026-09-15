@@ -1,0 +1,92 @@
+# 四工位 TCP 协议 v2
+
+这是 v1.4 默认入口使用的新协议。v1 的场次/轮次/裁判预期/目标下发不再适用。现场参赛软件需要同步调整；图示中的 `SCREW:4` 等只是设计示意，不是本协议报文。
+
+## 1. 项目、工位与帧
+
+同一个 IPv4 TCP 监听端口（默认9000），用 `project` + `station` 唯一区分四个工位。`project` 为 `screw` 或 `packaging`；`station` 为整数1或2，不能传字符串或布尔值。每工位一个活动连接，不允许另一连接抢占；同一连接不能切换项目或工位，换工号不需要重连。
+
+UTF-8（无BOM），每个完整 JSON 对象一行，LF结束；也接受 CRLF。不能把 JSON 美化为多行。TCP 拆包、粘包由接收器按换行处理。最大16KiB（不含LF，含可选CR），拒绝重复JSON键、NaN、Infinity、未知字段、非法Unicode。客户端需自行限制发送数据的大小。
+
+通用字段：`v`=整数2，`type`，`msg_id`=1～64字符文本（建议UUID）。工号 `worker_id`=1～64字符文本，不能含控制字符或前后空白；保留前导零。**工号仅是客户端自报的当前操作者信息，不是账户认证或报名资料。**
+
+## 2. 识别连接（可选 hello）
+
+```json
+{"v":2,"type":"hello","msg_id":"hello-001","project":"screw","station":1}
+```
+
+服务端：
+
+```json
+{"v":2,"reply_to":"hello-001","type":"hello_ok","project":"screw","station":1,"heartbeat_interval_s":5,"idle_timeout_s":30,"max_frame_bytes":16384}
+```
+
+也可省略 hello，第一条完整有效 result 自动绑定工位。连接后5秒内必须发送 hello 或第一条有效 result；因此相机准备时间较长时应先 hello。hello 不设置工号，不创建检测记录，也不返回标准条码。
+
+## 3. 电机螺钉
+
+```json
+{"v":2,"type":"result","msg_id":"detection-001","project":"screw","station":1,"worker_id":"D70516","screw_count":4}
+```
+
+`screw_count` 是0～2147483647的整数，0是实际检测到0颗，不等于未收到数据。不接受浮点数、数字字符串或布尔值。不要求、也不接受螺钉 `OK/NG`、缺钉位置或缺陷原因。服务端只记数量，不自动判 NG。
+
+## 4. 包装箱（三项）
+
+```json
+{"v":2,"type":"result","msg_id":"detection-002","project":"packaging","station":2,"worker_id":"D70517","barcode":"001234-AbC","logo":"OK","flame":"NG"}
+```
+
+`barcode` 为最多512字符的完整文本，保留前导零、大小写和前后空格，不进行数值化、裁剪、大小写折叠或Unicode归一化；不允许控制字符。未读到条码时明确上传空字符串 `""`。不要伪造一个条码。`logo` 与 `flame` 必须分别是大写 `OK` 或 `NG`，均为必填，无细分类型、原因或缺陷位置。不另做印刷型号文字OCR。
+
+服务端只在本地核对 `barcode`：
+
+| 保存的校验状态 | 含义 |
+|---|---|
+| MATCH | 非空条码与非空完整标准字符串完全相同 |
+| MISMATCH | 非空条码与已配置的标准不同 |
+| UNCONFIGURED | 非空条码已上报，但服务器尚未配置标准 |
+| UNREAD | 客户端明确上报空条码 |
+
+三项独立记录，不生成总评分或综合 OK/NG。LOGO NG 是视觉端的判断，不等于程序故障或扣分。未提交、报文无效、断线均不自动补三项结果。
+
+当前标准由管理员在包装箱页面预录，两个包装箱工位共用。结果入库时保存标准版本与完整快照，历史不因后续修改而重算。标准为空时表示未配置。标准只在服务器内部使用，不下发到工位。
+
+## 5. 持久化回执与重试
+
+```json
+{"v":2,"reply_to":"detection-002","type":"result_ack","recorded":true,"duplicate":false,"record_id":27}
+```
+
+提交到SQLite后才回复 `recorded:true`。此回执不代表识别正确、条码匹配或得到任何分数，不附带标准条码、条码校验状态、LOGO判分或目标下发。
+
+每次**新的检测**生成新的 `msg_id`，即使工号、螺钉数量或条码与上一条相同，也是一条新记录。ACK丢失时保留原消息ID、工号和所有内容原样重发（JSON键顺序可不同）；相同 `(project, station, msg_id)` 和相同内容只保存一次，返回原 `record_id` 和 `duplicate:true`。去重记录持久化，服务重启或重连后仍有效。重复旧报文不会把页面的当前操作者倒退为旧工号。
+
+同一消息ID改变数量、条码、工号或任意内容返回 `MSG_ID_CONFLICT`，不会覆盖原记录。更换标准后再重试旧报文，仍返回原记录，不用新标准重判。不同项目/工位之间的编号互不影响。
+
+## 6. 心跳与错误
+
+连续连接空闲时每5秒发送一次：
+
+```json
+{"v":2,"type":"ping","msg_id":"ping-001"}
+```
+
+```json
+{"v":2,"type":"pong","reply_to":"ping-001"}
+```
+
+30秒没有有效消息则断开；收到有效result也刷新活动时间。单个不完整帧最长5秒。每连接每秒最多100帧，累计5个协议错误关闭连接；全服务最多16个底层连接，其中最多4个工位被有效占用。
+
+常见错误：`BAD_VERSION`、`INVALID_FIELDS`、`INVALID_COUNT`、`INVALID_VERDICT`、`STATION_BUSY`、`STATION_MISMATCH`、`MSG_ID_CONFLICT`、`IDENTIFY_FIRST`。错误消息用 `type:error`，不是检测NG。错误报文不消耗一个合法消息ID的记录机会。异常字节和收发方向仍保留在通信日志中。
+
+连接断开只改变连接状态，不清除已经保存的记录。重连后未上报新检测时，卡片标注历史数据。不要把历史记录当成当前实时检测。工号随新有效result更新，服务端不执行注册、切换队伍或场次管理。
+
+## 7. 安全边界
+
+TCP v2 没有密码认证，也没有TLS，工位声明不是可靠身份凭据。仅用于可信隔离网络，跨网需VPN/SSH，不允许直接对公网暴露接收端口。Web登录保护标准配置、日志、导出与备份，不能替代TCP网络隔离。网页只读接口不返回标准条码或原始日志。
+
+## 8. 上位机示例
+
+`station_client.py` 提供一次性发送以及可导入的 `send_result(host, port, message)`。真实视觉程序可自行保持socket长连接，采图完成后组装上述JSON，发送换行帧，读取匹配 `reply_to` 的ACK。上报消息应绑定检测完成时的工号和实际结果，不要在重试旧消息时重新读取一个变化后的工号。
