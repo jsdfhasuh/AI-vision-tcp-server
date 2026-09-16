@@ -1,4 +1,4 @@
-"""Web v1.4: authenticated two-project monitor + limited read-only board."""
+"""Authenticated two-project monitor with batch catalog and per-station standards."""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -17,16 +17,16 @@ from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 
-from .webapp import RequestGuard, error  # Shared HTTP protections; no legacy Runtime is created.
+from .webapp import RequestGuard, error
 from .web_auth import Auth, COOKIE, Login, LoginLimited
 from .web_config import WebConfig
 from .station_protocol import ProtocolError, plain
 from .station_runtime import StationRuntime
-from .standard_json import EXAMPLE_STANDARD, parse_standard_json
+from .standard_json import EXAMPLE_STANDARD, EXAMPLE_CATALOG, IMPORT_BODY_BYTES, parse_catalog_json
 from .storage import csv_safe
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '1.4.0-stations'
+VERSION = '1.4.1-catalog'
 LOG = logging.getLogger(__name__)
 
 
@@ -43,7 +43,8 @@ def create_app(config: WebConfig) -> FastAPI:
 
     app = FastAPI(title='视觉比赛 TCP 服务器', version=VERSION, lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
-    app.add_middleware(RequestGuard, config=config)
+    app.add_middleware(RequestGuard, config=config,
+        body_limits={'/api/admin/standard-barcode/import': IMPORT_BODY_BYTES})
 
     @app.exception_handler(ProtocolError)
     async def protocol_error(request, exc):
@@ -122,7 +123,7 @@ def create_app(config: WebConfig) -> FastAPI:
 
     @app.get('/api/display')
     def display(project: str = 'screw'):
-        # Never includes standard_barcode, revision history, raw logs or IP addresses.
+        # No catalog, selected box, standard history, raw logs or IP addresses.
         return app.state.runtime.engine.snapshot(project, public=True)
 
     @app.post('/api/admin/standard-barcode')
@@ -138,26 +139,42 @@ def create_app(config: WebConfig) -> FastAPI:
     @app.post('/api/admin/standard-barcode/import')
     def import_standard(request: Request, payload: dict = Body(...), identity: Login = Depends(auth_required)):
         if set(payload) != {'content', 'revision'}:
-            raise ValueError('仅接受 JSON 文件内容 content 和当前标准版本 revision。')
-        barcode = parse_standard_json(payload['content'])
+            raise ValueError('仅接受 JSON 文件内容 content 和当前配置版本 revision。')
+        imported = parse_catalog_json(payload['content'])
         runtime = app.state.runtime
         if not runtime.healthy:
             raise HTTPException(503, '服务异常，暂不能导入配置。')
-        # Existing history and idempotency apply; no file path or original file is stored.
-        return runtime.store.set_standard(barcode, payload['revision'],
-                                          request.headers.get('x-request-id', ''), identity.username)
+        request_id = request.headers.get('x-request-id', '')
+        if imported['legacy']:
+            barcode = imported['boxes'][0]['standard_barcode'] if imported['boxes'] else ''
+            return runtime.store.set_standard(barcode, payload['revision'], request_id, identity.username)
+        return runtime.store.set_catalog(imported['boxes'], payload['revision'], request_id, identity.username)
+
+    @app.post('/api/admin/standard-barcode/select')
+    def select_standard(request: Request, payload: dict = Body(...), identity: Login = Depends(auth_required)):
+        if set(payload) != {'station', 'box_id', 'revision'}:
+            raise ValueError('仅接受 station、box_id、revision。')
+        runtime = app.state.runtime
+        if not runtime.healthy:
+            raise HTTPException(503, '服务异常，暂不能切换工位标准。')
+        return runtime.store.select_standard(payload['station'], payload['box_id'], payload['revision'],
+                                            request.headers.get('x-request-id', ''), identity.username)
 
     @app.get('/api/admin/standard-barcode/template')
-    def standard_template(identity: Login = Depends(auth_required)):
-        return Response(json.dumps(EXAMPLE_STANDARD, ensure_ascii=False, indent=2) + '\n',
+    def standard_template(format: str = 'single', identity: Login = Depends(auth_required)):
+        if format not in ('single', 'catalog'):
+            raise ValueError('模板格式只能是 single 或 catalog。')
+        template = EXAMPLE_CATALOG if format == 'catalog' else EXAMPLE_STANDARD
+        filename = 'packaging-standards.example.json' if format == 'catalog' else 'standard-barcode.example.json'
+        return Response(json.dumps(template, ensure_ascii=False, indent=2) + '\n',
                         media_type='application/json',
-                        headers={'Content-Disposition': 'attachment; filename="standard-barcode.example.json"'})
+                        headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
     @app.get('/api/admin/records')
     def records(project: str, station: int = 0, before: int = 0, limit: int = 100,
                 identity: Login = Depends(auth_required)):
         store = app.state.runtime.store
-        rows = [store.public(r) for r in store.records(project, station=station, before=before, limit=limit)]
+        rows = [store.admin_row(r) for r in store.records(project, station=station, before=before, limit=limit)]
         return {'records': rows, 'next_before': rows[-1]['id'] if len(rows) == limit else None}
 
     @app.get('/api/admin/export')
@@ -168,7 +185,8 @@ def create_app(config: WebConfig) -> FastAPI:
             raise ValueError('导出格式只能是 csv 或 jsonl。')
         columns = ('id', 'received_utc', 'project', 'station', 'worker_id', 'msg_id', 'screw_count') if project == 'screw' else (
             'id', 'received_utc', 'project', 'station', 'worker_id', 'msg_id', 'barcode',
-            'barcode_status', 'logo', 'flame', 'standard_revision', 'standard_barcode')
+            'barcode_status', 'logo', 'flame', 'standard_revision', 'standard_barcode',
+            'standard_box_id', 'standard_box_name')
         def stream():
             # Independent bounded-memory snapshot; exporting never holds the TCP engine lock.
             with store.reader() as db:

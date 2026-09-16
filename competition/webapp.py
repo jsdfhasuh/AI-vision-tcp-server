@@ -34,8 +34,9 @@ class RequestGuard:
     Headers from untrusted proxies never establish identity. Configure one public
     origin; reverse proxies must forward the original Host. All writes use JSON.
     """
-    def __init__(self, app, config: WebConfig):
+    def __init__(self, app, config: WebConfig, body_limits: dict[str, int] | None = None):
         self.app, self.config = app, config
+        self.body_limits = body_limits or {}
 
     async def __call__(self, scope, receive, send) -> None:
         if scope['type'] != 'http':
@@ -63,6 +64,7 @@ class RequestGuard:
             await reject(414, 'URL_TOO_LONG', '请求地址过长。')
             return
         method = scope['method']
+        max_body = self.body_limits.get(scope['path'], 16384) if method == 'POST' else 16384
         if method not in {'GET','HEAD','POST'}:
             await reject(405, 'METHOD_NOT_ALLOWED', '不支持此请求方法。')
             return
@@ -79,8 +81,8 @@ class RequestGuard:
         except ValueError:
             await reject(400, 'BAD_LENGTH', '无效请求长度。')
             return
-        if length < 0 or length > 16384:
-            await reject(413, 'BODY_TOO_LARGE', '请求正文最多16KiB。')
+        if length < 0 or length > max_body:
+            await reject(413, 'BODY_TOO_LARGE', f'请求正文最多{max_body // 1024}KiB。')
             return
         body, deadline = bytearray(), asyncio.get_running_loop().time() + 5
         while True:
@@ -92,8 +94,8 @@ class RequestGuard:
             if message['type'] == 'http.disconnect':
                 return
             body.extend(message.get('body', b''))
-            if len(body) > 16384:
-                await reject(413, 'BODY_TOO_LARGE', '请求正文最多16KiB。')
+            if len(body) > max_body:
+                await reject(413, 'BODY_TOO_LARGE', f'请求正文最多{max_body // 1024}KiB。')
                 return
             if not message.get('more_body', False):
                 break

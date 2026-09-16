@@ -168,7 +168,9 @@ class StandardJsonApiTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/admin/standard-barcode/import',json=payload,
                             headers={**self.headers,'Origin':'https://invalid.example'}).status_code,403)
         self.assertEqual(self.post(' '*4097).status_code,400)
-        self.assertEqual(self.post(' '*20000).status_code,413)
+        # Import now has a larger, route-specific budget for batch JSON.
+        self.assertEqual(self.post(' '*20000).status_code,400)
+        self.assertEqual(self.post(' '*(2*1024*1024)).status_code,413)
 
     def test_unknown_payload_keys_rejected(self):
         self.assertEqual(self.client.post('/api/admin/standard-barcode/import',

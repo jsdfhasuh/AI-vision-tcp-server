@@ -10,10 +10,11 @@ import time
 import uuid
 
 from .storage import DataLock, utc_now, json_text
+from .packaging_catalog import CatalogMixin
 from .station_protocol import ProtocolError, fingerprint, plain, route
 
 APPLICATION_ID = 0x56535432  # VST2; deliberately distinct from the legacy database.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 PUBLIC_COLUMNS = ('id', 'received_utc', 'project', 'station', 'worker_id', 'screw_count',
                   'barcode', 'barcode_status', 'logo', 'flame')
 DDL = (
@@ -46,7 +47,7 @@ DDL = (
 )
 
 
-class StationStore:
+class StationStore(CatalogMixin):
     def __init__(self, path: Path):
         self.path = path.resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,21 +55,24 @@ class StationStore:
         self.lock = threading.RLock()
         self.closed = False
         self.db = None
+        self.migration_backup = None
         try:
             self.db = sqlite3.connect(self.path, timeout=3, check_same_thread=False)
             self.db.row_factory = sqlite3.Row
             app_id = self.db.execute('PRAGMA application_id').fetchone()[0]
             version = self.db.execute('PRAGMA user_version').fetchone()[0]
             tables = self.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
-            if not tables and version == 0 and app_id == 0:
+            fresh = not tables and version == 0 and app_id == 0
+            if fresh:
                 self.db.execute('BEGIN IMMEDIATE')
                 for statement in DDL:
                     self.db.execute(statement)
                 self.db.execute('INSERT INTO standards VALUES(0,?,?,?)', ('', utc_now(), 'system'))
                 self.db.execute(f'PRAGMA application_id={APPLICATION_ID}')
-                self.db.execute(f'PRAGMA user_version={SCHEMA_VERSION}')
+                self.db.execute('PRAGMA user_version=1')
                 self.db.commit()
-            elif (app_id, version) != (APPLICATION_ID, SCHEMA_VERSION):
+                version = 1
+            elif app_id != APPLICATION_ID or version not in (1, SCHEMA_VERSION):
                 raise ValueError('未知或旧版数据库；新接收器仅使用 station-results.sqlite3，不覆盖旧库。')
             required = {'standards', 'standard_updates', 'results', 'events'}
             actual = {r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -78,6 +82,14 @@ class StationStore:
             if self.db.execute('PRAGMA journal_mode=WAL').fetchone()[0] != 'wal':
                 raise ValueError('无法启用工位数据库 WAL。')
             self.db.execute('PRAGMA synchronous=FULL')
+            if version == 1:
+                if not fresh:
+                    self.migration_backup = self.backup()
+                self.migrate_catalog()
+            for table, columns in {'standards': {'boxes_json', 'selections_json'},
+                                   'results': {'standard_box_id', 'standard_box_name'}}.items():
+                if not columns <= {r[1] for r in self.db.execute(f'PRAGMA table_info({table})')}:
+                    raise ValueError('工位标准清单结构不完整，请保留原文件检查。')
         except BaseException:
             if self.db is not None:
                 self.db.close()
@@ -102,26 +114,7 @@ class StationStore:
 
     def standard(self) -> dict:
         with self.lock:
-            return dict(self.db.execute('SELECT * FROM standards ORDER BY revision DESC LIMIT 1').fetchone())
-
-    def set_standard(self, barcode: str, revision: int, request_id: str, actor: str) -> dict:
-        plain(barcode, 'barcode', 512, empty=True)
-        plain(request_id, 'request_id', 128)
-        if len(request_id) < 16 or type(revision) is not int or revision < 0:
-            raise ProtocolError('INVALID_FIELD', 'invalid request ID or revision')
-        digest = fingerprint({'barcode': barcode, 'revision': revision, 'actor': actor})
-        with self.transaction() as db:
-            old = db.execute('SELECT * FROM standard_updates WHERE request_id=?', (request_id,)).fetchone()
-            if old:
-                if old['fingerprint'] != digest:
-                    raise ProtocolError('REQUEST_CONFLICT', 'request ID already used with other content')
-                return {'ok': True, 'revision': old['revision'], 'duplicate': True}
-            latest = db.execute('SELECT revision FROM standards ORDER BY revision DESC LIMIT 1').fetchone()[0]
-            if revision != latest:
-                raise ProtocolError('STATE_CHANGED', '标准条码已被修改，请重新载入后确认。')
-            db.execute('INSERT INTO standards VALUES(?,?,?,?)', (latest + 1, barcode, utc_now(), actor))
-            db.execute('INSERT INTO standard_updates VALUES(?,?,?)', (request_id, digest, latest + 1))
-            return {'ok': True, 'revision': latest + 1, 'duplicate': False}
+            return dict(self.db.execute('SELECT revision,barcode,updated_utc,actor FROM standards ORDER BY revision DESC LIMIT 1').fetchone())
 
     def record(self, message: dict, received: str) -> tuple[dict, bool]:
         digest = fingerprint(message)
@@ -133,21 +126,26 @@ class StationStore:
                     raise ProtocolError('MSG_ID_CONFLICT', 'msg_id already recorded with different content')
                 return dict(old), True
             standard, version, status = None, None, None
+            box_id, box_name = None, None
             if message['project'] == 'packaging':
-                current = db.execute('SELECT * FROM standards ORDER BY revision DESC LIMIT 1').fetchone()
-                standard, version = current['barcode'], current['revision']
+                current, box = self.expected_box(db, message['station'])
+                version = current['revision']
+                standard = box['standard_barcode'] if box else ''
+                box_id, box_name = (box['id'], box['name']) if box else (None, None)
                 if message['barcode'] == '':
                     status = 'UNREAD'
-                elif standard == '':
+                elif not current['boxes']:
                     status = 'UNCONFIGURED'
+                elif box is None:
+                    status = 'UNSELECTED'
                 else:
                     status = 'MATCH' if message['barcode'] == standard else 'MISMATCH'
             values = (received, *key[:2], message['worker_id'], key[2], digest,
                       message.get('screw_count'), message.get('barcode'), status,
-                      message.get('logo'), message.get('flame'), version, standard, json_text(message))
+                      message.get('logo'), message.get('flame'), version, standard, json_text(message), box_id, box_name)
             cursor = db.execute('''INSERT INTO results(received_utc,project,station,worker_id,msg_id,fingerprint,
-                screw_count,barcode,barcode_status,logo,flame,standard_revision,standard_barcode,raw_json)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
+                screw_count,barcode,barcode_status,logo,flame,standard_revision,standard_barcode,raw_json,standard_box_id,standard_box_name)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
             result = dict(db.execute('SELECT * FROM results WHERE id=?', (cursor.lastrowid,)).fetchone())
             return result, False
 
@@ -194,6 +192,13 @@ class StationStore:
     @staticmethod
     def public(row: dict | None) -> dict | None:
         return {k: row[k] for k in PUBLIC_COLUMNS} if row else None
+
+    @staticmethod
+    def admin_row(row: dict | None) -> dict | None:
+        if not row:
+            return None
+        return {**StationStore.public(row), 'standard_box_id': row['standard_box_id'],
+                'standard_box_name': row['standard_box_name'], 'standard_revision': row['standard_revision']}
 
     def backup(self) -> Path:
         """Independent read connection; never holds the result writer lock."""

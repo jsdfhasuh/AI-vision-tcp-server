@@ -1,0 +1,19 @@
+{
+  "boxes": [
+    {
+      "id": "BOX01",
+      "name": "1号包装箱",
+      "standard_barcode": "001234-AbC"
+    },
+    {
+      "id": "BOX02",
+      "name": "2号包装箱",
+      "standard_barcode": "005678-DeF"
+    },
+    {
+      "id": "BOX03",
+      "name": "3号包装箱",
+      "standard_barcode": "009012-GhI"
+    }
+  ]
+}

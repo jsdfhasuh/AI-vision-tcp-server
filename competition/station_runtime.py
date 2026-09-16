@@ -95,13 +95,15 @@ class StationEngine:
                     'worker_id': peer.worker_id if connected else None,
                     'address': peer.name if connected and not public else None,
                     'last_is_current': bool(connected and latest and peer.last_result_id == latest['id']),
-                    'latest': self.store.public(latest)})
+                    'latest': (self.store.public if public else self.store.admin_row)(latest)})
             answer = {'project': project, 'stations': stations, 'fatal': self.fatal,
                       'generated_utc': utc_now()}
             if not public:
                 answer['standard'] = self.store.standard()
+                if project == 'packaging':
+                    answer['catalog'] = self.store.catalog()
         # Query through independent read connections, outside the engine lock.
-        answer['records'] = [self.store.public(r) for r in self.store.records(project)]
+        answer['records'] = [(self.store.public if public else self.store.admin_row)(r) for r in self.store.records(project)]
         if not public:
             answer['logs'] = self.store.logs(project)
         return answer

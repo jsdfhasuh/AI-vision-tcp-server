@@ -1,95 +1,85 @@
-# 视觉比赛 TCP 服务器 · v1.4.0-stations
+# 视觉比赛 TCP 服务器 · v1.4.1-catalog
 
-面向 **两个项目、每项目两个工位** 的 TCP 数据接收与 Web 展示程序。服务器不负责排赛、建立测试轮次、自动评分或排名。
+两个项目、每项目两个工位。提供TCP接收、数据保存和两个项目分页展示，不管理比赛场次、轮次、评分或排名。
 
-| 项目页 | 参赛端上传的业务数据 | 服务端处理 |
+| 项目 | 参赛端上传 | 服务器处理 |
 |---|---|---|
-| 电机螺钉（1、2号工位） | 当前选手工号、螺钉数量 | 记录数量；不自行推断缺钉位置或判定 NG |
-| 包装箱检查（1、2号工位） | 当前选手工号、完整条码、LOGO OK/NG、火焰标识 OK/NG | 完整条码与预录标准精确比较；另两项原样记录 |
+| 电机螺钉1/2工位 | 当前选手工号、螺钉数量 | 记录数量，不推断缺钉位置或判NG |
+| 包装箱1/2工位 | 当前选手工号、完整条码、LOGO OK/NG、火焰标识 OK/NG | 按本工位当前标准精确比对条码；另两项独立记录 |
 
-**工号只是操作者标识，不是登录认证，也不用于创建比赛场次。** 型号判断只靠标签上的完整条码比对，不识别印刷型号文字。LOGO、火焰标识均不细分缺陷原因。三个包装箱结果独立保存，无自动综合判定。
+工号只是操作者信息，不是身份认证，也不决定校验标准。型号只靠完整条码比对，不另做印刷型号文字识别；LOGO/火焰不细分缺陷原因，不输出综合得分。
+
+## 新增：多包装箱标准清单
+
+一个本地JSON文件可批量导入最多1000条标准（同时受256 KiB文件限制）。管理端预览、确认导入后，**两个包装箱工位分别选择当前标准**。不是“上传条码在清单里就通过”。
+
+```json
+{
+  "boxes": [
+    {"id": "BOX01", "name": "1号包装箱", "standard_barcode": "001234-AbC"},
+    {"id": "BOX02", "name": "2号包装箱", "standard_barcode": "005678-DeF"}
+  ]
+}
+```
+
+完整说明、兼容规则和接口见 [JSON批量录入指南](docs/STANDARD_BARCODE_JSON.md)，示例在`examples/packaging-standards.example.json`。原来的`{"standard_barcode":"..."}`仍兼容，但会替换为共享单条标准并应用到两个工位。
+
+批量导入是整批替换。保留条目编号和原条码可保留已有选择；删除或更改条码会取消受影响工位的选择。未选择不会自动判不匹配。历史记录保存当时的标准快照，修改不重判。标准只在服务器使用，不下发给选手。
 
 ## 启动与更新
 
-默认入口现在启动新四工位接收器：
+更新前先停止旧服务、备份数据目录；不要删除已有凭据和数据库。
 
 ```powershell
+git pull --ff-only origin main
 python -m pip install -r requirements-web.txt
-# 首次部署才执行；已经有 secrets/admin.json 时不要覆盖。
-python tools/init_web_admin.py
+# 首次部署才执行；已有 secrets/admin.json 时不要覆盖：
+# python tools/init_web_admin.py
 python web_server.py
 ```
 
-管理端：`http://localhost:9080/admin/`；只读展板：`http://localhost:9080/board/`。在顶部页签切换电机螺钉与包装箱检查。TCP 默认监听 `127.0.0.1:9000`，按报文中的项目和工位区分四路，切页面不会断开另一项目的 TCP 连接。
+管理端`http://localhost:9080/admin/`；只读展板`http://localhost:9080/board/`。TCP默认`127.0.0.1:9000`；项目和工位由报文区分，切页面不影响其余工位接收。自定义端口时配置匹配的`--public-url`。
 
-在包装箱管理页保存完整标准条码。**两个包装箱工位共用当前标准，标准不会下发给参赛端。** 空标准表示未配置。每条包装箱记录保存当时的标准快照；修改标准不会重新判定历史记录。
+Docker挂载与管理员初始化沿用 [部署指南](docs/DOCKER_ORACLE.md)，升级时使用`docker compose up -d --build`重建本地镜像，不要只重启旧镜像。旧文档中的v1.3场次操作不适用于新默认入口。本次不包含Oracle/ARM64或真实相机、PLC部署验收。
 
-已有数据、凭据和配置目录请原样保留。更新前先停旧服务、备份数据，再拉取代码并启动，避免同一端口被重复监听。非默认端口时需同时设置 `--port` 与匹配的 `--public-url`。
+## TCP v2
 
-Docker 沿用原有目录挂载和凭据初始化方式；镜像标记更新为 `1.4.0-stations`：
-
-```bash
-docker compose up -d --build
-docker compose logs --tail=100 app
-```
-
-首次 Docker/Oracle 安装的账户、挂载权限、HTTPS 与 SSH 隧道配置见 [部署指南](docs/DOCKER_ORACLE.md)；其中 v1.3 的单场次操作说明不适用于新默认入口。此次没有实际构建镜像或部署 Oracle/ARM64。
-
-## TCP v2 上报示例
-
-每个 JSON 对象一行，以真正的 LF 换行结尾；不是把字符串 `\n` 放在报文末尾。无需创建场次、获取接入码、确认目标或等待“开始本轮”。第一次完整有效上报即可绑定工位，也可以先发送 `hello`。
-
-电机螺钉：
+每条报文一个UTF-8 JSON对象，以真正的LF换行结束。可先hello或直接上报；不需要创建场次、接入码或轮次。
 
 ```json
-{"v":2,"type":"result","msg_id":"unique-detection-001","project":"screw","station":1,"worker_id":"D70516","screw_count":4}
+{"v":2,"type":"result","msg_id":"unique-001","project":"screw","station":1,"worker_id":"D70516","screw_count":4}
+{"v":2,"type":"result","msg_id":"unique-002","project":"packaging","station":1,"worker_id":"D70516","barcode":"001234-AbC","logo":"OK","flame":"NG"}
 ```
 
-包装箱：
-
-```json
-{"v":2,"type":"result","msg_id":"unique-detection-002","project":"packaging","station":1,"worker_id":"D70516","barcode":"001234-AbC","logo":"OK","flame":"NG"}
-```
-
-完整字段、连续连接、心跳、重复上报和重连规则见 [TCP v2 协议](docs/PROTOCOL_V2_STATIONS.md)。ACK 仅表示数据已保存，不返回标准条码或条码核对结论。
-
-可用新示例客户端联调：
+详细约束见 [协议v2](docs/PROTOCOL_V2_STATIONS.md)。ACK只表示持久化，不反馈标准或条码是否匹配；同ID原样重试不重复入库、不重判。连续工作程序保持TCP长连接并发送心跳。
 
 ```powershell
 python station_client.py --project screw --station 1 --worker-id D70516 --count 4
 python station_client.py --project packaging --station 1 --worker-id D70516 --barcode "001234-AbC" --logo OK --flame NG
 ```
 
-两条命令各发送一条记录后退出；连续上报程序应维持长连接并发送心跳。**旧 `client_example.py` / `vision_client.py` 是 v1 场次协议客户端，不能直接连接新版。**
+示例客户端一次上报后退出。旧`client_example.py`、`vision_client.py`是v1协议，不能连接新版默认接收器。此次新增批量JSON与分工位选择**不改变TCP v2报文**。
 
-## 数据与安全边界
+## 数据、兼容与安全
 
-新数据保存在 `data/station-results.sqlite3`，旧 `competition.sqlite3` 不覆盖、不自动转换。新旧数据库的业务含义不同，不能把旧 OK/NG 历史伪装成新的螺钉数量、条码或火焰检查记录。
+新数据在`data/station-results.sqlite3`；旧`competition.sqlite3`不覆盖不转换。此次工位库升级schema v1→v2，先在`data/station-backups/`生成独立备份，然后事务升级；原标准继续有效、旧结果不变。回退旧代码需使用升级前备份和新空数据目录，不能对新库强制降级。
 
-管理页保留最新 100 条记录和 50 条通信日志，可按工位筛选。CSV/JSONL 导出读取全部所选项目/工位记录，不只是屏幕上的 100 条；“仅不匹配/NG”只影响页面筛选。JSONL 保留精确文本，CSV 在电子表格软件中应将工号和条码列按文本导入以保留前导零。导出内容和备份包含标准条码快照，必须保管好。
+管理端显示最近100条记录、50条通信日志，可筛工位和包装箱不匹配/NG。导出读取全部所选项目/工位记录，包含历史标准编号、名称、条码和版本；JSONL保留精确文本。CSV在电子表格中应按文本导入工号、条码列以保留前导零。备份及导出包含私有标准，注意保管。
 
-新备份位于 `data/station-backups/`，通过管理页备份按钮生成独立 SQLite 文件；正常停机默认也备份（`AUTO_BACKUP=0` 可关闭）。旧 `database_tools.py` 只管理旧数据库，不要用它恢复新库。恢复新库时先停服务，在**新的空数据目录**中把独立备份复制为 `station-results.sqlite3`，使用原凭据启动验证；不要直接覆盖一个仍有 WAL/SHM 的运行目录。
+标准、日志和维护操作要求管理员登录；只读展板不返回标准清单、标准快照或原始日志。原管理员Cookie、Host、Origin、CSRF保护保留。
 
-浏览器操作沿用管理员登录、Cookie、Origin/Host 和 CSRF 校验。标准条码、原始通信日志、来源地址只在登录后的接口提供；只读展板展示上报数据，不提供这些配置或维护操作。
+TCP v2是可信隔离网络内的明文协议，没有客户端密码认证；工位号和工号不能证明身份。**不要把9000端口直接开放到公网**；跨网使用可信VPN/SSH隧道。四工位各独占一个连接，不允许后来连接抢占。通信异常不补NG，存储失败不虚报已保存。
 
-TCP v2 是可信隔离网络内的明文协议，没有客户端密码认证；工位号和工号不能证明发送者身份。**不要将 9000 端口直接开放到公网**，跨网使用可信 VPN/SSH 隧道，现场限制接入设备。四个工位各允许一个活动连接，后来的连接不能抢占已有工位。通信异常不补成 NG；存储故障停止接收，不虚报已保存。
-
-## 兼容与代码位置
-
-- 新业务：`competition/station_protocol.py`、`station_store.py`、`station_runtime.py`、`station_webapp.py`。
-- 新界面：`competition/monitor/`；并非先前只修改页面的 UI 骨架包。
-- 旧核心和界面保留为兼容路径；`python web_server.py --legacy-v1` 明确启动旧协议。它不是四工位接收器，不能与新入口占用同一端口。
-- `server.py` / `start_server.cmd` 仍为旧桌面入口。新版请启动 `web_server.py`。
-- 继承 `8db21f7` 的 Windows 备份 `fsync` 修复，没有覆盖掉它。
+旧桌面`server.py`/`start_server.cmd`和显式`python web_server.py --legacy-v1`保留为旧协议路径；不能与新服务占用同一端口。Windows备份fsync修复仍保留。
 
 ## 测试
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py' -v
-python tests/station_http_smoke.py --output-dir ./test-evidence/http
-# 以下两项需可选 Playwright 与 Chromium，不是运行服务的必需依赖：
-python tests/station_frontend_render.py --output-dir ./test-evidence/offline
-python tests/station_browser_smoke.py --output-dir ./test-evidence/browser
+python tests/catalog_http_smoke.py --output-dir ./test-evidence/catalog-http
+# 以下依赖可选的Playwright和Chromium：
+python tests/station_frontend_render.py --output-dir ./test-evidence/catalog-offline
+python tests/station_browser_smoke.py --output-dir ./test-evidence/catalog-browser
 ```
 
-本次：240 项自动化测试通过；真实 HTTP + 四个 TCP 连接完成 40 次检测和 4 次重复确认；离线浏览器 DOM 检查通过。**浏览器直接访问本地 HTTP 被测试环境策略拦截，端到端浏览器验收尚未完成**；没有把离线示例渲染当成现场实测。详见 [v1.4 测试报告](docs/TEST_REPORT_V1_4_STATIONS.md)。
+本次实际执行范围及未验证条件见 [批量标准测试报告](docs/TEST_REPORT_V1_4_CATALOG.md)。离线浏览器合成数据渲染不等同于联机验收。`SOURCE_MANIFEST.json`是v1.4.0原始发布快照，不代表后续Git增量提交。
