@@ -249,6 +249,16 @@ class TextTCPTests(unittest.TestCase):
         self.assertEqual(c.send('hello,packaging,1,end'),b'HELLO,end');self.assertEqual(c.send('ping,end'),b'PONG,end')
         self.assertEqual(self.store.records('packaging'),[])
 
+    def test_delayed_identification_after_five_seconds(self):
+        hello_client, result_client = self.client(), self.client()
+        time.sleep(6)
+        self.assertEqual(self.runtime.engine.peers, {})
+        self.assertEqual(hello_client.send('hello,packaging,1,end'), b'HELLO,end')
+        self.assertEqual(hello_client.send('ping,end'), b'PONG,end')
+        self.assertEqual(result_client.send('screw,1,G1,4,OK,end'), b'ACK,end')
+        self.assertEqual(len(self.store.records('screw')), 1)
+        self.assertEqual(self.store.records('packaging'), [])
+
     def test_error_limit(self):
         c=self.client()
         for _ in range(5):self.assertEqual(c.send('screw,1,G1,-1,OK,end'),b'ERR,FORMAT,end')

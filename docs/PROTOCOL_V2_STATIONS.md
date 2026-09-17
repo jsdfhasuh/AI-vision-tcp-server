@@ -22,7 +22,7 @@ UTF-8（无BOM），每个完整 JSON 对象一行，LF结束；也接受 CRLF�
 {"v":2,"reply_to":"hello-001","type":"hello_ok","project":"screw","station":1,"heartbeat_interval_s":5,"idle_timeout_s":30,"max_frame_bytes":16384}
 ```
 
-也可省略 hello，第一条完整有效 result 自动绑定工位。连接后5秒内必须发送 hello 或第一条有效 result；因此相机准备时间较长时应先 hello。hello 不设置工号，不创建检测记录，也不返回标准条码。
+也可省略 hello，第一条完整有效 result 自动绑定工位。连接后可等待再发送 hello 或第一条有效 result，不再要求5秒内标识工位。未标识连接仍计入全服务16个连接上限。hello 不设置工号，不创建检测记录，也不返回标准条码。
 
 ## 3. 电机螺钉
 
@@ -80,7 +80,7 @@ v1.4.1起，管理员在包装箱页面通过JSON批量导入标准清单，两�
 {"v":2,"type":"pong","reply_to":"ping-001"}
 ```
 
-30秒没有有效消息则断开；收到有效result也刷新活动时间。单个不完整帧最长5秒。每连接每秒最多100帧，累计5个协议错误关闭连接；全服务最多16个底层连接，其中最多4个工位被有效占用。
+标识工位后30秒没有有效消息则断开；收到有效result也刷新活动时间。单个不完整帧最长5秒。每连接每秒最多100帧，累计5个协议错误关闭连接；全服务最多16个底层连接，其中最多4个工位被有效占用。
 
 常见错误：`BAD_VERSION`、`INVALID_FIELDS`、`INVALID_COUNT`、`INVALID_VERDICT`、`STATION_BUSY`、`STATION_MISMATCH`、`MSG_ID_CONFLICT`、`IDENTIFY_FIRST`。错误消息用 `type:error`，不是检测NG。错误报文不消耗一个合法消息ID的记录机会。异常字节和收发方向仍保留在通信日志中。
 

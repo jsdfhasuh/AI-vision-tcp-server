@@ -144,7 +144,7 @@ class StationPeer:
 
     def run(self):
         buffer = bytearray()
-        connected_at = last_valid = time.monotonic()
+        last_valid = time.monotonic()
         partial_at = None
         frames = deque()
         errors = 0
@@ -152,8 +152,6 @@ class StationPeer:
         try:
             while self.alive:
                 now = time.monotonic()
-                if self.key is None and now - connected_at > 5:
-                    reason = '5秒内未标识工位'; break
                 if self.key is not None and now - last_valid > 30:
                     reason = '30秒未收到有效消息或心跳'; break
                 if partial_at is not None and now - partial_at > 5:
