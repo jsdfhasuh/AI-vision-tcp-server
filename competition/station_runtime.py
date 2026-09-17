@@ -10,6 +10,7 @@ import threading
 import time
 
 from . import station_protocol as p
+from .station_text import FrameDecoder, decode_text, encode_reply
 from .storage import utc_now
 from .station_store import StationStore
 from .web_config import WebConfig
@@ -39,7 +40,7 @@ class StationEngine:
             at = utc_now()
             message = None
             try:
-                message = p.validate(p.decode(raw[:-1]))
+                message = decode_text(raw) if peer.framer.mode == 'text' else p.validate(p.decode(raw[:-1]))
                 if message['type'] in ('hello', 'result'):
                     key = p.route(message['project'], message['station'])
                     if peer.key and peer.key != key:
@@ -117,6 +118,7 @@ class StationPeer:
         self.worker_id = None
         self.last_result_id = None
         self.alive = True
+        self.framer = FrameDecoder()
         self.sock.settimeout(.25)
         self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
@@ -129,7 +131,7 @@ class StationPeer:
         self.sock.close()
 
     def send(self, message: dict):
-        raw = p.encode(message)
+        raw = encode_reply(message) if self.framer.mode == 'text' else p.encode(message)
         try:
             self.sock.sendall(raw)
         except OSError:
@@ -162,15 +164,24 @@ class StationPeer:
                 if not buffer:
                     partial_at = time.monotonic()
                 buffer.extend(chunk)
-                while b'\n' in buffer and self.alive:
-                    end = buffer.index(b'\n')
-                    raw = bytes(buffer[:end + 1]); del buffer[:end + 1]
+                while self.alive:
+                    try:
+                        raw = self.framer.pop(buffer)
+                    except p.ProtocolError as exc:
+                        reason = str(exc)
+                        self.engine.store.event(self.key, self.name, 'RX_ERROR', exc.code, bytes(buffer))
+                        self.send({'v': 2, 'type': 'error', 'code': exc.code, 'message': reason})
+                        self.close(); break  # Ambiguous framing: do not guess the next boundary.
+                    if raw is None:
+                        if not buffer:
+                            partial_at = None
+                        break
                     partial_at = time.monotonic() if buffer else None
                     now = time.monotonic()
                     while frames and now - frames[0] > 1:
                         frames.popleft()
                     frames.append(now)
-                    if len(frames) > 100 or end > p.MAX_FRAME:
+                    if len(frames) > 100:
                         reason = '报文超长或频率超过100条/秒'
                         self.engine.store.event(self.key, self.name, 'RX_ERROR', 'LIMIT', raw)
                         self.send({'v': 2, 'type': 'error', 'code': 'LIMIT', 'message': reason})
