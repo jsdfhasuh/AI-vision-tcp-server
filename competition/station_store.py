@@ -14,9 +14,10 @@ from .packaging_catalog import CatalogMixin
 from .station_protocol import ProtocolError, fingerprint, plain, route
 
 APPLICATION_ID = 0x56535432  # VST2; deliberately distinct from the legacy database.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PUBLIC_COLUMNS = ('id', 'received_utc', 'project', 'station', 'worker_id', 'screw_count',
-                  'barcode', 'barcode_status', 'logo', 'flame')
+                  'barcode', 'barcode_status', 'logo', 'flame', 'group_id',
+                  'detection_result', 'total_result')
 DDL = (
     """CREATE TABLE standards(revision INTEGER PRIMARY KEY, barcode TEXT NOT NULL,
            updated_utc TEXT NOT NULL, actor TEXT NOT NULL)""",
@@ -72,7 +73,7 @@ class StationStore(CatalogMixin):
                 self.db.execute('PRAGMA user_version=1')
                 self.db.commit()
                 version = 1
-            elif app_id != APPLICATION_ID or version not in (1, SCHEMA_VERSION):
+            elif app_id != APPLICATION_ID or version not in (1, 2, SCHEMA_VERSION):
                 raise ValueError('未知或旧版数据库；新接收器仅使用 station-results.sqlite3，不覆盖旧库。')
             required = {'standards', 'standard_updates', 'results', 'events'}
             actual = {r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -82,18 +83,34 @@ class StationStore(CatalogMixin):
             if self.db.execute('PRAGMA journal_mode=WAL').fetchone()[0] != 'wal':
                 raise ValueError('无法启用工位数据库 WAL。')
             self.db.execute('PRAGMA synchronous=FULL')
+            if version < SCHEMA_VERSION and not fresh:
+                self.migration_backup = self.backup()
             if version == 1:
-                if not fresh:
-                    self.migration_backup = self.backup()
                 self.migrate_catalog()
+            if version < SCHEMA_VERSION:
+                self.migrate_group_results()
             for table, columns in {'standards': {'boxes_json', 'selections_json'},
-                                   'results': {'standard_box_id', 'standard_box_name'}}.items():
+                                   'results': {'standard_box_id', 'standard_box_name', 'group_id',
+                                               'detection_result', 'total_result'}}.items():
                 if not columns <= {r[1] for r in self.db.execute(f'PRAGMA table_info({table})')}:
                     raise ValueError('工位标准清单结构不完整，请保留原文件检查。')
         except BaseException:
             if self.db is not None:
                 self.db.close()
             self.owner.close()
+            raise
+
+    def migrate_group_results(self) -> None:
+        """Add nullable fields without inventing group IDs/verdicts for old observations."""
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            self.db.execute('ALTER TABLE results ADD COLUMN group_id TEXT')
+            self.db.execute("ALTER TABLE results ADD COLUMN detection_result TEXT CHECK(detection_result IN ('OK','NG'))")
+            self.db.execute("ALTER TABLE results ADD COLUMN total_result TEXT CHECK(total_result IN ('OK','NG'))")
+            self.db.execute('PRAGMA user_version=3')
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
             raise
 
     @contextmanager
@@ -117,6 +134,12 @@ class StationStore(CatalogMixin):
             return dict(self.db.execute('SELECT revision,barcode,updated_utc,actor FROM standards ORDER BY revision DESC LIMIT 1').fetchone())
 
     def record(self, message: dict, received: str) -> tuple[dict, bool]:
+        # Keep legacy worker-based JSON separate from new group-based text.
+        from .station_text import validate_result
+        if 'group_id' in message:
+            validate_result(message)
+        elif 'detection_result' in message or 'total_result' in message:
+            raise ProtocolError('INVALID_FIELDS', 'reported results require a group_id')
         digest = fingerprint(message)
         key = (message['project'], message['station'], message['msg_id'])
         with self.transaction() as db:
@@ -140,12 +163,14 @@ class StationStore(CatalogMixin):
                     status = 'UNSELECTED'
                 else:
                     status = 'MATCH' if message['barcode'] == standard else 'MISMATCH'
-            values = (received, *key[:2], message['worker_id'], key[2], digest,
+            values = (received, *key[:2], message.get('worker_id', ''), key[2], digest,
                       message.get('screw_count'), message.get('barcode'), status,
-                      message.get('logo'), message.get('flame'), version, standard, json_text(message), box_id, box_name)
+                      message.get('logo'), message.get('flame'), version, standard, json_text(message), box_id, box_name,
+                      message.get('group_id'), message.get('detection_result'), message.get('total_result'))
             cursor = db.execute('''INSERT INTO results(received_utc,project,station,worker_id,msg_id,fingerprint,
-                screw_count,barcode,barcode_status,logo,flame,standard_revision,standard_barcode,raw_json,standard_box_id,standard_box_name)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
+                screw_count,barcode,barcode_status,logo,flame,standard_revision,standard_barcode,raw_json,standard_box_id,standard_box_name,
+                group_id,detection_result,total_result)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
             result = dict(db.execute('SELECT * FROM results WHERE id=?', (cursor.lastrowid,)).fetchone())
             return result, False
 

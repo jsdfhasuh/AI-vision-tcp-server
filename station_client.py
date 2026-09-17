@@ -1,8 +1,6 @@
-"""One-shot station client: comma-separated text ending in end by default.
+"""One-shot client for station + group reports. No automatic text retries.
 
-send_text_result() never retries: text has no detection ID, and replaying the
-same frame creates another observation. send_result() retains the original
-JSON v2 helper for existing callers; --json-v2 selects it on the command line.
+Legacy JSON v2 helpers retain worker-ID and msg_id semantics separately.
 """
 from __future__ import annotations
 
@@ -36,11 +34,7 @@ def send_result(host: str, port: int, message: dict, timeout: float = 5) -> dict
 
 
 def send_text_result(host: str, port: int, message: dict, timeout: float = 5) -> str:
-    """Send once and wait for ACK,end without assuming recv() returns a frame.
-
-    message is a normalized Python dict (same business fields as v2); no JSON
-    or msg_id is transmitted. A timeout/disconnect is an UNKNOWN outcome.
-    """
+    """Send one group observation, wait for ACK,end. Timeout means outcome unknown."""
     wire = encode_result(message)
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError('timeout must be positive and finite')
@@ -67,30 +61,39 @@ def send_text_result(host: str, port: int, message: dict, timeout: float = 5) ->
 
 
 def main():
-    parser = argparse.ArgumentParser(description='四工位上报示例：逗号分隔、end结尾（不是视觉识别程序）')
+    parser = argparse.ArgumentParser(description='工位号＋组别号，上报数量/条码及OK/NG，end结尾')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=9000)
     parser.add_argument('--project', choices=['screw', 'packaging'], required=True)
     parser.add_argument('--station', type=int, choices=[1, 2], required=True)
-    parser.add_argument('--worker-id', required=True)
-    parser.add_argument('--json-v2', action='store_true', help='兼容旧JSON v2；默认发送简单文本')
-    parser.add_argument('--msg-id', help='仅JSON v2重试使用；简单文本没有检测编号')
+    parser.add_argument('--group-id', help='文本必填，例如 G1 或 001；不是工位号/工号')
+    parser.add_argument('--result', choices=['OK', 'NG'], help='文本必填：螺钉检测结果或包装箱总结果')
+    parser.add_argument('--worker-id', help='仅旧 --json-v2 使用，不与组别号混用')
+    parser.add_argument('--json-v2', action='store_true', help='显式兼容旧JSON v2（不携带新字段）')
+    parser.add_argument('--msg-id', help='仅JSON v2重试使用；文本没有检测编号')
     parser.add_argument('--count', type=int)
     parser.add_argument('--barcode', help='完整字符串；未读到时明确传空字符串')
     parser.add_argument('--logo', choices=['OK', 'NG'])
     parser.add_argument('--flame', choices=['OK', 'NG'])
     args = parser.parse_args()
-    if args.msg_id is not None and not args.json_v2:
-        parser.error('--msg-id 仅适用于 --json-v2；文本重发会新增记录。')
     message = {'v': 2, 'type': 'result', 'msg_id': args.msg_id or uuid.uuid4().hex,
-               'project': args.project, 'station': args.station, 'worker_id': args.worker_id}
+               'project': args.project, 'station': args.station}
+    if args.json_v2:
+        if args.worker_id is None or args.group_id is not None or args.result is not None:
+            parser.error('旧JSON v2使用 --worker-id，不接受 --group-id 或 --result。')
+        message['worker_id'] = args.worker_id
+    else:
+        if args.group_id is None or args.result is None or args.worker_id is not None or args.msg_id is not None:
+            parser.error('文本必须提供 --group-id 和 --result；不接受 --worker-id 或 --msg-id。')
+        message['group_id'] = args.group_id
+        message['detection_result' if args.project == 'screw' else 'total_result'] = args.result
     if args.project == 'screw':
         if args.count is None or any(v is not None for v in (args.barcode, args.logo, args.flame)):
-            parser.error('螺钉项目只接受 --count。')
+            parser.error('螺钉项目使用 --count，不接受条码/LOGO/火焰字段。')
         message['screw_count'] = args.count
     else:
         if args.count is not None or any(v is None for v in (args.barcode, args.logo, args.flame)):
-            parser.error('包装箱项目必须提供 --barcode、--logo 和 --flame。')
+            parser.error('包装箱必须提供 --barcode、--logo 和 --flame，不接受 --count。')
         message.update(barcode=args.barcode, logo=args.logo, flame=args.flame)
     try:
         if args.json_v2:

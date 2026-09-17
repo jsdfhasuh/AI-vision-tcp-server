@@ -26,7 +26,7 @@ from .standard_json import EXAMPLE_STANDARD, EXAMPLE_CATALOG, IMPORT_BODY_BYTES,
 from .storage import csv_safe
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '1.4.1-catalog'
+VERSION = '1.5.0-station-groups'
 LOG = logging.getLogger(__name__)
 
 
@@ -183,9 +183,10 @@ def create_app(config: WebConfig) -> FastAPI:
         where, args = store.filters(project, station)
         if format not in ('csv', 'jsonl'):
             raise ValueError('导出格式只能是 csv 或 jsonl。')
-        columns = ('id', 'received_utc', 'project', 'station', 'worker_id', 'msg_id', 'screw_count') if project == 'screw' else (
-            'id', 'received_utc', 'project', 'station', 'worker_id', 'msg_id', 'barcode',
-            'barcode_status', 'logo', 'flame', 'standard_revision', 'standard_barcode',
+        columns = ('id', 'received_utc', 'project', 'station', 'group_id', 'worker_id', 'msg_id',
+                   'screw_count', 'detection_result') if project == 'screw' else (
+            'id', 'received_utc', 'project', 'station', 'group_id', 'worker_id', 'msg_id', 'barcode',
+            'barcode_status', 'logo', 'flame', 'total_result', 'standard_revision', 'standard_barcode',
             'standard_box_id', 'standard_box_name')
         def stream():
             # Independent bounded-memory snapshot; exporting never holds the TCP engine lock.

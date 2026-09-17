@@ -63,7 +63,8 @@ class StationEngine:
                 else:
                     row, duplicate = self.store.record(message, at)
                     if not duplicate:
-                        peer.worker_id = message['worker_id']
+                        peer.worker_id = message.get('worker_id')
+                        peer.group_id = message.get('group_id')
                         peer.last_result_id = row['id']
                     # ACK acknowledges persistence only. Never disclose the standard or match result.
                     reply.update(type='result_ack', recorded=True, duplicate=duplicate, record_id=row['id'])
@@ -94,6 +95,7 @@ class StationEngine:
                 connected = bool(peer and peer.alive and not self.fatal)
                 stations.append({'station': number, 'connected': connected,
                     'worker_id': peer.worker_id if connected else None,
+                    'group_id': peer.group_id if connected else None,
                     'address': peer.name if connected and not public else None,
                     'last_is_current': bool(connected and latest and peer.last_result_id == latest['id']),
                     'latest': (self.store.public if public else self.store.admin_row)(latest)})
@@ -116,6 +118,7 @@ class StationPeer:
         self.name = f'{address[0]}:{address[1]}'
         self.key = None
         self.worker_id = None
+        self.group_id = None
         self.last_result_id = None
         self.alive = True
         self.framer = FrameDecoder()

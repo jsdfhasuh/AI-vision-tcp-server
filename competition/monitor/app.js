@@ -91,7 +91,7 @@
     card.querySelector('.current-box').textContent='当前生效：'+boxName(selected);
     card.querySelector('.selection-note').textContent=d.dirty?(d.revision!==model.catalog.revision?
       '配置已变化；保留待选值，请重新载入后确认。':'尚未应用；点击应用标准后，仅影响本工位之后接收的记录。'):
-      '只与本工位选定标准比较；工号不决定校验标准。';
+      '只与本工位选定标准比较；组别号不决定校验标准。';
   }
   function makeStation(s){
     const card=node('article',null,'station');card.dataset.station=String(s.station);
@@ -116,17 +116,17 @@
       const fresh=model.online,latest=s.latest,live=card.querySelector('.station-live');
       card.classList.toggle('is-stale',!fresh||!s.last_is_current);
       const head=node('div',null,'station-title');head.append(node('h3',s.station+'号工位'),badge(!fresh?'状态未知':s.connected?'已连接':'未连接',fresh&&s.connected?'ok':'neutral'));
-      const frag=document.createDocumentFragment();frag.append(head,field('当前选手工号',s.worker_id||'—','worker'));
+      const frag=document.createDocumentFragment();frag.append(head,field('当前组别号',s.group_id||'—','worker'));
       if(!publicView)frag.append(field('客户端地址',s.address||'—','code'));
       frag.append(field('最近接收时间',stamp(latest?.received_utc)));
       const result=node('div',null,'result-block');
       if(model.project==='screw'){
         const count=node('div',null,'count-row'),value=node('strong',latest?.screw_count??'—','count');
         if(latest?.screw_count!=null)value.append(node('small','颗'));
-        count.append(node('span','最近螺钉数量','count-label'),value);result.append(count);
+        count.append(node('span','最近螺钉数量','count-label'),value);result.append(count,field('检测结果（上报）',verdict(latest?.detection_result)));
       }else{
         result.append(field('上传条码',latest?.barcode===''?'（未读取）':latest?.barcode??'—','code'));
-        result.append(field('条码校验结果',barcodeBadge(latest?.barcode_status)),field('LOGO 检查',verdict(latest?.logo)),field('火焰标识检查',verdict(latest?.flame)));
+        result.append(field('条码校验结果',barcodeBadge(latest?.barcode_status)),field('LOGO 检查',verdict(latest?.logo)),field('火焰标识检查',verdict(latest?.flame)),field('总结果（上报）',verdict(latest?.total_result)));
         if(!publicView&&latest)result.append(field('本条使用标准',latest.standard_box_name?latest.standard_box_id+' · '+latest.standard_box_name:latest.barcode_status==='UNSELECTED'?'未选择':latest.barcode_status==='UNCONFIGURED'?'未配置':'旧版 / 无标准'));
       }
       frag.append(result,node('p',!fresh?'页面已暂停更新，保留上次记录。':latest&&!s.last_is_current?'保留上次检测记录，本连接尚无新上报。':latest?'已保存工位上报数据。':'等待工位上传数据。','station-note'));live.replaceChildren(frag);
@@ -136,15 +136,15 @@
   function renderTables(){
     const snapshot=model.snapshot;if(!snapshot)return;
     const station=Number($('station-filter').value),pkg=model.project==='packaging';
-    const issue=r=>['MISMATCH','UNREAD'].includes(r.barcode_status)||r.logo==='NG'||r.flame==='NG';
-    const rows=snapshot.records.filter(r=>(!station||r.station===station)&&(!pkg||!$('issues-only').checked||issue(r)));
+    const issue=r=>pkg?['MISMATCH','UNREAD'].includes(r.barcode_status)||r.logo==='NG'||r.flame==='NG'||r.total_result==='NG':r.detection_result==='NG';
+    const rows=snapshot.records.filter(r=>(!station||r.station===station)&&(!$('issues-only').checked||issue(r)));
     const frag=document.createDocumentFragment();
-    for(const r of rows){const tr=node('tr');for(const v of [stamp(r.received_utc),r.station+'号工位',r.worker_id])tr.append(node('td',v,'nowrap'));
+    for(const r of rows){const tr=node('tr');for(const v of [stamp(r.received_utc),r.station+'号工位',r.group_id??'—'])tr.append(node('td',v,'nowrap'));
       if(pkg){
         tr.append(node('td',r.barcode===''?'（未读取）':r.barcode,'barcode code'));
         if(!publicView)tr.append(node('td',r.standard_box_name?r.standard_box_id+' · '+r.standard_box_name:'—'));
-        for(const b of [barcodeBadge(r.barcode_status),verdict(r.logo),verdict(r.flame)]){const td=node('td');td.append(b);tr.append(td);}
-      }else tr.append(node('td',r.screw_count+' 颗','nowrap'));
+        for(const b of [barcodeBadge(r.barcode_status),verdict(r.logo),verdict(r.flame),verdict(r.total_result)]){const td=node('td');td.append(b);tr.append(td);}
+      }else {tr.append(node('td',r.screw_count+' 颗','nowrap'));const td=node('td');td.append(verdict(r.detection_result));tr.append(td);}
       frag.append(tr);
     }
     $('records-body').replaceChildren(frag);$('records-empty').hidden=rows.length>0;$('records-empty').textContent=snapshot.records.length?'当前筛选下没有记录':'等待工位上传数据';
@@ -177,9 +177,11 @@
     stopPoll();model.project=project;model.snapshot=null;model.online=false;
     const pkg=project==='packaging';document.querySelectorAll('[data-project]').forEach(b=>{b.classList.toggle('active',b.dataset.project===project);b.setAttribute('aria-current',b.dataset.project===project?'page':'false');});
     $('page-number').textContent=pkg?'PROJECT 02':'PROJECT 01';$('page-title').textContent=pkg?'包装箱检查项目':'电机螺钉项目';
-    $('page-description').textContent=pkg?'按工位当前标准核对完整条码；LOGO 与火焰标识独立记录 OK / NG。':'接收检测到的螺钉数量，工号仅标明当前操作者。';
-    $('barcode-config').hidden=!pkg||publicView;$('issues-control').hidden=!pkg;$('records-title').textContent='检测记录（'+(pkg?'包装箱检查':'电机螺钉')+'）';
-    const tr=node('tr');for(const h of ['接收时间','工位','选手工号',...(pkg?['上传条码',...(!publicView?['本条校验标准']:[]),'条码校验','LOGO','火焰标识']:['螺钉数量'])])tr.append(node('th',h));$('records-head').replaceChildren(tr);
+    $('page-description').textContent=pkg?'按工位核对完整条码；LOGO、火焰标识、总结果均原样记录参赛端上报值。':'按工位接收组别号、螺钉数量及检测结果；不按数量重新判定。';
+    $('issues-label').textContent=pkg?'仅不匹配 / NG':'仅 NG';
+    $('records-note').textContent=pkg?'最近100条；条码按接收时的工位标准校验，总结果原样记录上报值。':'最近100条；检测结果原样记录上报值，不按数量重算。';
+    $('barcode-config').hidden=!pkg||publicView;$('issues-control').hidden=false;$('records-title').textContent='检测记录（'+(pkg?'包装箱检查':'电机螺钉')+'）';
+    const tr=node('tr');for(const h of ['接收时间','工位','组别号',...(pkg?['上传条码',...(!publicView?['本条校验标准']:[]),'条码校验','LOGO','火焰标识','总结果（上报）']:['螺钉数量','检测结果（上报）'])])tr.append(node('th',h));$('records-head').replaceChildren(tr);
     for(const id of ['stations','records-body','logs-body'])$(id).replaceChildren();$('records-empty').hidden=false;$('records-empty').textContent='正在载入项目数据…';updateControls();refresh(model.epoch);
   }
   async function applySelection(station){

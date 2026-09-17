@@ -15,7 +15,7 @@ import uuid
 from fastapi.testclient import TestClient
 from competition.standard_json import (EXAMPLE_CATALOG, EXAMPLE_STANDARD, MAX_CATALOG_BYTES,
     IMPORT_BODY_BYTES, parse_catalog_json, parse_standard_json, validate_boxes)
-from competition.station_store import StationStore, APPLICATION_ID, DDL
+from competition.station_store import StationStore, APPLICATION_ID, DDL, SCHEMA_VERSION
 from competition.station_protocol import encode, decode, ProtocolError
 from competition.station_webapp import create_app
 from competition.storage import utc_now
@@ -262,7 +262,7 @@ class CatalogStoreTests(unittest.TestCase):
         db=sqlite3.connect(path)
         try:
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0],'ok')
-            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],2)
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],SCHEMA_VERSION)
             self.assertEqual(json.loads(db.execute('SELECT selections_json FROM standards ORDER BY revision DESC LIMIT 1').fetchone()[0])['2'],'BOX02')
             self.assertEqual(db.execute('SELECT standard_box_name FROM results').fetchone()[0],'2号包装箱')
         finally:db.close()

@@ -1,17 +1,32 @@
-# 视觉比赛 TCP 服务器 · v1.4.1-catalog
+# 视觉比赛 TCP 服务器 · v1.5.0-station-groups
 
-两个项目、每项目两个工位。提供TCP接收、数据保存和两个项目分页展示，不管理比赛场次、轮次、评分或排名。
+两个项目、每项目两个工位。负责TCP接收、持久化和分页显示，不管理场次、轮次、评分或排名。
 
-| 项目 | 参赛端上传 | 服务器处理 |
-|---|---|---|
-| 电机螺钉1/2工位 | 当前选手工号、螺钉数量 | 记录数量，不推断缺钉位置或判NG |
-| 包装箱1/2工位 | 当前选手工号、完整条码、LOGO OK/NG、火焰标识 OK/NG | 按本工位当前标准精确比对条码；另两项独立记录 |
+## 当前两种上报格式
 
-工号只是操作者信息，不是身份认证，也不决定校验标准。型号只靠完整条码比对，不另做印刷型号文字识别；LOGO/火焰不细分缺陷原因，不输出综合得分。
+```text
+screw,工位号,组别号,螺钉数量,检测结果,end
+packaging,工位号,组别号,完整条码,LOGO结果,火焰标识结果,总结果,end
+```
 
-## 新增：多包装箱标准清单
+可直接发送的例子（每行使用对应工位的连接）：
 
-一个本地JSON文件可批量导入最多1000条标准（同时受256 KiB文件限制）。管理端预览、确认导入后，**两个包装箱工位分别选择当前标准**。不是“上传条码在清单里就通过”。
+```text
+screw,1,G1,4,OK,end
+packaging,2,G2,001234-AbC,OK,NG,NG,end
+```
+
+UTF-8，英文逗号分隔，小写`end`结尾，不需要换行。工位号只能1或2；组别号按文本保存，`001`不会变成`1`。当前格式不再额外携带工号。检测结果、LOGO、火焰标识、总结果均须为大写`OK`或`NG`。
+
+- 电机螺钉：保存组别、数量和**参赛端上报的检测结果**，不按数量重算。
+- 包装箱：服务器按本工位选定标准核对完整条码；LOGO、火焰和**参赛端上报的总结果**分别原样保存。条码校验不覆盖总结果；总结果不由服务器重新合成。
+- 工位号区分设备，组别号区分参赛组；组别变化不要求重连，也不决定使用哪个条码标准。
+
+成功保存后回复`ACK,end`，格式错误回复`ERR,FORMAT,end`。ACK不是检测OK，也不是条码匹配反馈。缺字段、旧文本布局不会被猜测为新布局。详见[当前文本协议](docs/PROTOCOL_TEXT.md)。
+
+没有读取条码时保留空字段，例如`packaging,1,G1,,OK,NG,NG,end`。条码前导零、大小写、首尾空格和Unicode原样保留；组别号和条码都不能含英文逗号或控制字符。连续相同文本分别记为新检测；没有检测ID，ACK丢失时先核对记录，不能盲目重发。
+
+## 包装箱标准：本地JSON批量录入
 
 ```json
 {
@@ -22,74 +37,52 @@
 }
 ```
 
-完整说明、兼容规则和接口见 [JSON批量录入指南](docs/STANDARD_BARCODE_JSON.md)，示例在`examples/packaging-standards.example.json`。原来的`{"standard_barcode":"..."}`仍兼容，但会替换为共享单条标准并应用到两个工位。
+管理端选择电脑上的JSON文件，预览后确认导入；**两个包装箱工位分别选择当前标准并应用**，不是清单中任意条码命中即通过。文件最多1000条且256 KiB。导入整批替换；删除或修改当前条目的条码会取消受影响工位的选择。旧`{"standard_barcode":"..."}`兼容为共享单条标准。
 
-批量导入是整批替换。保留条目编号和原条码可保留已有选择；删除或更改条码会取消受影响工位的选择。未选择不会自动判不匹配。历史记录保存当时的标准快照，修改不重判。标准只在服务器使用，不下发给选手。
+标准只供服务器核对，不下发给工位，不识别印刷型号文字。不配置/不选择标准/未读条码分别显示对应状态，不假报NG。每条记录保留入库当时的标准快照，切换标准不改判历史；换箱前先等待上一件结果入库。详细格式和规则见[JSON清单指南](docs/STANDARD_BARCODE_JSON.md)，示例在`examples/packaging-standards.example.json`。
 
-## 启动与更新
+## 更新与启动
 
-更新前先停止旧服务、备份数据目录；不要删除已有凭据和数据库。
+先停旧服务并另存数据目录备份，确认本地改动已处理，再执行：
 
 ```powershell
 git pull --ff-only origin main
 python -m pip install -r requirements-web.txt
-# 首次部署才执行；已有 secrets/admin.json 时不要覆盖：
-# python tools/init_web_admin.py
 python web_server.py
 ```
 
-管理端`http://localhost:9080/admin/`；只读展板`http://localhost:9080/board/`。TCP默认`127.0.0.1:9000`；项目和工位由报文区分，切页面不影响其余工位接收。自定义端口时配置匹配的`--public-url`。
+首次部署才执行`python tools/init_web_admin.py`，已有凭据不重建。管理页`http://localhost:9080/admin/`；只读页`http://localhost:9080/board/`。TCP默认`127.0.0.1:9000`；跨电脑连接需配置可信局域网监听地址。网页端口和TCP端口不同。非默认网页地址同时设置匹配的`--public-url`。
 
-Docker挂载与管理员初始化沿用 [部署指南](docs/DOCKER_ORACLE.md)，升级时使用`docker compose up -d --build`重建本地镜像，不要只重启旧镜像。旧文档中的v1.3场次操作不适用于新默认入口。本次不包含Oracle/ARM64或真实相机、PLC部署验收。
-
-## TCP 上报：逗号分隔，end 结尾
-
-新版支持直接发送一条UTF-8文本，不需要JSON、检测编号或额外换行：
-
-```text
-screw,1,D70516,4,end
-packaging,1,D70516,001234-AbC,OK,NG,end
-```
-
-电机螺钉顺序：`screw,工位号,工号,螺钉数量,end`。
-包装箱顺序：`packaging,工位号,工号,完整条码,LOGO,火焰标识,end`。
-工位为1或2；项目名和`end`小写，`OK/NG`大写。条码未读到保留空字段：`packaging,1,D70516,,OK,NG,end`。
-
-成功保存回复`ACK,end`；格式错误回复`ERR,FORMAT,end`。条码仍由服务器按该工位选定的标准完整比对，不下发标准。**标准清单文件继续用JSON导入，不受TCP文本格式影响。**
-
-每条文本都是一次新检测，相同内容连续发送也分别记录；没有检测编号，不能自动识别丢失ACK后的重试。超时先核对服务器记录，不要盲目重发。工号与条码不能包含英文逗号或换行，不增加转义规则；条码的前导零、大小写、空格原样保留。详见 [简单文本协议](docs/PROTOCOL_TEXT.md)。
+示例客户端默认发送当前文本格式：
 
 ```powershell
-python station_client.py --project screw --station 1 --worker-id D70516 --count 4
-python station_client.py --project packaging --station 1 --worker-id D70516 --barcode "001234-AbC" --logo OK --flame NG
+python station_client.py --project screw --station 1 --group-id G1 --count 4 --result OK
+python station_client.py --project packaging --station 2 --group-id G2 --barcode "001234-AbC" --logo OK --flame NG --result NG
 ```
 
-示例客户端默认发送上述纯文本，打印`ACK,end`后退出，不自动重试。长期连接可先发`hello,screw,1,end`（回复`HELLO,end`），空闲每5秒发`ping,end`（回复`PONG,end`）；首次5秒未标识、空闲30秒或不完整帧超过5秒会断开。
+`--result`对应电机的检测结果或包装箱的总结果，必须显式填写，不能自动推断。客户端发一条后退出，不自动重试，页面之后显示断开但记录保留。长连接可先发`hello,screw,1,end`或`hello,packaging,2,end`，空闲每5秒发`ping,end`；回复分别为`HELLO,end`、`PONG,end`。
 
-原 [JSON v2](docs/PROTOCOL_V2_STATIONS.md) 在同端口保留兼容，每个连接固定一种格式；JSON仍以LF结尾、按原msg_id去重。旧Python函数`send_result()`保留JSON行为；新函数`send_text_result()`发送文本。示例脚本加`--json-v2`可显式测试旧格式，`--msg-id`只可与该选项一起使用。旧v1场次客户端仍不能连接默认接收器。
+Docker挂载及管理员配置沿用[部署指南](docs/DOCKER_ORACLE.md)。更新使用`docker compose up -d --build`重建，不能只重启旧镜像。旧版场次操作不适用于默认入口，本次没有进行Docker或Oracle部署验收。
 
-## 数据、兼容与安全
+## 数据升级和兼容
 
-新数据在`data/station-results.sqlite3`；旧`competition.sqlite3`不覆盖不转换。批量标准版本将工位库升级schema v1→v2，先在`data/station-backups/`生成独立备份，然后事务升级；原标准继续有效、旧结果不变。回退旧代码需使用升级前备份和新空数据目录，不能对新库强制降级。本次文本协议扩展不再改变数据库结构。
+工位数据使用`data/station-results.sqlite3`，旧`competition.sqlite3`不覆盖。此版本升级工位schema至3，**已有库先生成独立备份再升级**；新增可空的`group_id`、`detection_result`、`total_result`。历史工号、原始报文、ID和检测记录不改写，不拿工号冒充组别，不补历史缺失的OK/NG。新文本记录不写假工号；旧NOT NULL工号列留空串用于结构兼容。
 
-管理端显示最近100条记录、50条通信日志，可筛工位和包装箱不匹配/NG。导出读取全部所选项目/工位记录，包含历史标准编号、名称、条码和版本；JSONL保留精确文本。CSV在电子表格中应按文本导入工号、条码列以保留前导零。备份及导出包含私有标准，注意保管。
+升级后旧代码不能直接打开新工位库。回退时停服务，在新的空数据目录使用升级前备份和旧代码，不覆盖带WAL/SHM的运行目录。原标准目录、工位选择、去重回执和Windows备份句柄修复保留。
 
-标准、日志和维护操作要求管理员登录；只读展板不返回标准清单、标准快照或原始日志。原管理员Cookie、Host、Origin、CSRF保护保留。
+原[JSON v2](docs/PROTOCOL_V2_STATIONS.md)作为显式兼容保留，仍上传worker_id，不支持新组别/总结果字段，不能把JSON工号转换成组别。CLI使用`--json-v2 --worker-id ...`，旧Python函数`send_result()`不变；`send_text_result()`现在要求新组别与结果字段。旧文本`...工号...`且没有检测/总结果的格式不再接受，参赛端须同步更新。
 
-TCP文本和JSON v2都是可信隔离网络内的明文协议，没有客户端密码认证；工位号和工号不能证明身份。**不要把9000端口直接开放到公网**；跨网使用可信VPN/SSH隧道。四工位各独占一个连接，不允许后来连接抢占。通信异常不补NG，存储失败不虚报已保存。
+管理端/只读页均显示组别和新结果列；历史无对应数据时显示`—`。管理端CSV和JSONL导出包含新字段，并保留历史工号；CSV工号/组别/条码列应按文本导入。标准、原始日志、导出和维护仍受管理员权限保护，只读页不提供标准清单或历史标准快照。
 
-旧桌面`server.py`/`start_server.cmd`和显式`python web_server.py --legacy-v1`保留为旧协议路径；不能与新服务占用同一端口。Windows备份fsync修复仍保留。
+两种TCP格式均为可信隔离网络中的明文，组别/工位号不是身份认证。**不要直接把9000端口开放到公网**；跨网使用可信VPN/SSH。每个项目+工位独占连接，后来的连接不能抢占。存储故障不虚报成功，通信错误不伪造NG。
 
-## 测试
+旧桌面`server.py`、`start_server.cmd`及`python web_server.py --legacy-v1`保持独立旧协议路径。新版使用默认`web_server.py`，不要与旧进程占同一端口。
 
-文本协议回归：`python -m unittest discover -s tests -p 'test_station_text.py' -v`。执行范围见 [文本协议测试记录](docs/TEST_REPORT_TEXT.md)。
+## 验证
 
 ```bash
 python -m unittest discover -s tests -p 'test_*.py' -v
-python tests/catalog_http_smoke.py --output-dir ./test-evidence/catalog-http
-# 以下依赖可选的Playwright和Chromium：
-python tests/station_frontend_render.py --output-dir ./test-evidence/catalog-offline
-python tests/station_browser_smoke.py --output-dir ./test-evidence/catalog-browser
+python tests/group_frontend_render.py --output-dir ./test-evidence/group-offline
 ```
 
-此前批量标准的执行范围及未验证条件见 [批量标准测试报告](docs/TEST_REPORT_V1_4_CATALOG.md)。离线浏览器合成数据渲染不等同于联机验收。`SOURCE_MANIFEST.json`是v1.4.0原始发布快照，不代表后续Git增量提交。
+本次实际执行范围见[工位、组别与结果测试记录](docs/TEST_REPORT_STATION_GROUPS.md)。离线浏览器使用合成响应，不等同于浏览器联机或现场验收。`SOURCE_MANIFEST.json`继续为v1.4.0原始发布快照，不代表后续Git增量提交。

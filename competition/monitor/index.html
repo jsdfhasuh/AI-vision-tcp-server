@@ -24,7 +24,7 @@
   <main>
     <div id="connection-alert" class="alert" hidden role="alert"></div>
     <div id="fatal-alert" class="alert" hidden role="alert"></div>
-    <section class="heading"><div><p id="page-number" class="eyebrow">PROJECT 01</p><h1 id="page-title">电机螺钉项目</h1><p id="page-description" class="muted">接收检测到的螺钉数量，工号仅标明当前操作者。</p></div><div class="service-state"><span id="web-state" class="badge neutral">连接中</span><small id="listen-state">等待服务端</small><small id="updated-at">—</small></div></section>
+    <section class="heading"><div><p id="page-number" class="eyebrow">PROJECT 01</p><h1 id="page-title">电机螺钉项目</h1><p id="page-description" class="muted">按工位接收组别号、螺钉数量及检测结果；不按数量重新判定。</p></div><div class="service-state"><span id="web-state" class="badge neutral">连接中</span><small id="listen-state">等待服务端</small><small id="updated-at">—</small></div></section>
     <section id="barcode-config" class="panel config" hidden>
       <div class="section-title"><h2>包装箱标准清单 · JSON 批量导入</h2><span class="muted">仅供服务器比对，不下发到工位</span><a class="secondary" href="/api/admin/standard-barcode/template?format=catalog" download>下载批量 JSON 示例</a></div>
       <form id="barcode-form">
@@ -38,11 +38,11 @@
       <p id="standard-note" class="muted small-text">导入后，在下方两个工位分别选择当前标准。不会自动匹配清单中的任意条码。</p>
     </section>
     <section id="stations" class="stations" aria-label="工位实时数据"></section>
-    <section class="panel records"><div class="section-title"><div><h2 id="records-title">检测记录（电机螺钉）</h2><p class="muted small-text">最近100条；校验按接收当时的工位标准，切换不改判历史。</p></div><div class="record-actions"><label class="inline">工位<select id="station-filter"><option value="0">全部工位</option><option value="1">1号工位</option><option value="2">2号工位</option></select></label><label id="issues-control" class="inline" hidden><input id="issues-only" type="checkbox">仅不匹配 / NG</label><a id="export-csv" class="secondary" download>导出 CSV</a><a id="export-jsonl" class="secondary" download>导出原始记录</a></div></div>
+    <section class="panel records"><div class="section-title"><div><h2 id="records-title">检测记录（电机螺钉）</h2><p id="records-note" class="muted small-text">最近100条；检测结果原样记录上报值。</p></div><div class="record-actions"><label class="inline">工位<select id="station-filter"><option value="0">全部工位</option><option value="1">1号工位</option><option value="2">2号工位</option></select></label><label id="issues-control" class="inline" hidden><input id="issues-only" type="checkbox"><span id="issues-label">仅 NG</span></label><a id="export-csv" class="secondary" download>导出 CSV</a><a id="export-jsonl" class="secondary" download>导出原始记录</a></div></div>
       <div class="table-wrap"><table><thead id="records-head"></thead><tbody id="records-body"></tbody></table></div><p id="records-empty" class="empty">等待工位上传数据</p>
     </section>
     <section id="logs-panel" class="panel"><div class="section-title"><h2>TCP 通信日志</h2><span class="muted small-text">最近50条 · 接收 RX / 发送 TX · 不删除历史</span></div><div class="table-wrap"><table><thead><tr><th>时间</th><th>方向</th><th>工位</th><th>报文内容</th></tr></thead><tbody id="logs-body"></tbody></table></div><p id="logs-empty" class="empty">暂无本项目通信日志</p></section>
-    <footer><span>工号标明操作者；不进行评分、排名或型号文字识别。</span><div><span id="backup-result"></span><button id="backup" class="secondary">备份工位数据库</button><span id="readonly-label" hidden>只读展板</span></div></footer>
+    <footer><span>工位号区分设备，组别号区分参赛组；检测结果/总结果为上报值，不评分、不重算。</span><div><span id="backup-result"></span><button id="backup" class="secondary">备份工位数据库</button><span id="readonly-label" hidden>只读展板</span></div></footer>
   </main>
 </div><div id="toast" class="toast" role="status" hidden></div>
 <noscript>本界面需要启用 JavaScript；TCP 服务独立运行。</noscript>
